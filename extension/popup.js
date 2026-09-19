@@ -59,6 +59,10 @@ function render(status) {
 
 function loadStatus() {
   chrome.storage.local.get(['codexBridgeStatus'], (result) => render(result.codexBridgeStatus || DEFAULT_STATUS));
+  chrome.runtime.sendMessage({ type: 'codex-bridge-get-status' }, (response) => {
+    if (chrome.runtime.lastError || !response?.status) return;
+    render(response.status);
+  });
 }
 
 chrome.runtime.onMessage.addListener((message) => {

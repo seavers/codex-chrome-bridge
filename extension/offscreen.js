@@ -20,6 +20,8 @@ let socket = null;
 let reconnectTimer = null;
 let clientIdPromise = null;
 let profileIdPromise = null;
+let statusWrite = Promise.resolve();
+let latestStatus = null;
 
 function storageLocalGet(keys) {
   if (!chrome?.storage?.local) return Promise.resolve({});
@@ -41,7 +43,11 @@ function publishStatus(status) {
     updatedAt: Date.now(),
     bridgeUrl: BRIDGE_WS,
   };
-  storageLocalSet({ [BRIDGE_STATUS_KEY]: nextStatus }).catch(() => {});
+  latestStatus = nextStatus;
+  // 按状态产生顺序写入，避免“已连接”先产生却被较早的“未连接”覆盖。
+  statusWrite = statusWrite
+    .then(() => storageLocalSet({ [BRIDGE_STATUS_KEY]: nextStatus }))
+    .catch(() => {});
   chrome.runtime.sendMessage({ type: 'codex-bridge-status', status: nextStatus }).catch(() => {});
 }
 
@@ -181,6 +187,12 @@ function handleSocketOpen() {
 function handleSocketMessageEvent(event) {
   handleSocketMessage(event).catch(handleSocketError);
 }
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== 'codex-bridge-get-status') return undefined;
+  sendResponse({ ok: true, status: latestStatus });
+  return undefined;
+});
 
 function connect() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
