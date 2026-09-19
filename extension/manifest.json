@@ -25,6 +25,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Chrome MCP Bridge"
+    "default_title": "Chrome MCP Bridge",
+    "default_popup": "popup.html"
   }
 }

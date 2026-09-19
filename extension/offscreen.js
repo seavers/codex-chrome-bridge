@@ -2,6 +2,19 @@ const BRIDGE_WS = 'ws://127.0.0.1:17376/extension';
 const RECONNECT_MS = 1500;
 const EXTENSION_NAME = 'Chrome MCP Bridge';
 const EXTENSION_VERSION = '0.4.1';
+const BRIDGE_STATUS_KEY = 'codexBridgeStatus';
+const ACTION_LABELS = {
+  tabs: '读取标签页',
+  windows: '读取窗口',
+  open: '打开页面',
+  click: '点击元素',
+  type: '输入文字',
+  snapshot: '获取页面快照',
+  text: '读取页面文字',
+  screenshot: '截图',
+  observe: '观察页面变化',
+  diagnostics: '读取页面诊断',
+};
 
 let socket = null;
 let reconnectTimer = null;
@@ -20,6 +33,20 @@ function storageLocalSet(value) {
   return new Promise((resolve) => {
     chrome.storage.local.set(value, () => resolve());
   });
+}
+
+function publishStatus(status) {
+  const nextStatus = {
+    ...status,
+    updatedAt: Date.now(),
+    bridgeUrl: BRIDGE_WS,
+  };
+  storageLocalSet({ [BRIDGE_STATUS_KEY]: nextStatus }).catch(() => {});
+  chrome.runtime.sendMessage({ type: 'codex-bridge-status', status: nextStatus }).catch(() => {});
+}
+
+function actionLabel(action) {
+  return ACTION_LABELS[action] || action || '未知动作';
 }
 
 function getClientId() {
@@ -91,6 +118,8 @@ async function handleSocketMessage(event) {
 
   if (!command.id || !command.action) return;
 
+  publishStatus({ state: 'working', detail: `正在执行：${actionLabel(command.action)}`, action: command.action });
+
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'codex-bridge-command',
@@ -99,6 +128,12 @@ async function handleSocketMessage(event) {
     });
 
     if (response?.ok) {
+      publishStatus({
+        state: 'connected',
+        detail: `已完成：${actionLabel(command.action)}`,
+        action: command.action,
+        response: { ok: true },
+      });
       safeSocketSend({
         id: command.id,
         ok: true,
@@ -106,6 +141,12 @@ async function handleSocketMessage(event) {
         info: await helloPayload(),
       });
     } else {
+      publishStatus({
+        state: 'error',
+        detail: `执行失败：${actionLabel(command.action)}`,
+        action: command.action,
+        response: { ok: false, error: response?.error || 'Background command failed' },
+      });
       safeSocketSend({
         id: command.id,
         ok: false,
@@ -116,6 +157,12 @@ async function handleSocketMessage(event) {
       });
     }
   } catch (error) {
+    publishStatus({
+      state: 'error',
+      detail: `响应失败：${actionLabel(command.action)}`,
+      action: command.action,
+      response: { ok: false, error: String(error?.message || error) },
+    });
     safeSocketSend({
       id: command.id,
       ok: false,
@@ -127,6 +174,7 @@ async function handleSocketMessage(event) {
 }
 
 function handleSocketOpen() {
+  publishStatus({ state: 'connected', detail: '已连接，正在监听 Codex 请求' });
   sendHello().catch(handleSocketError);
 }
 
@@ -139,6 +187,7 @@ function connect() {
     return;
   }
 
+  publishStatus({ state: 'connecting', detail: '正在连接本地监听地址' });
   socket = new WebSocket(BRIDGE_WS);
 
   socket.addEventListener('open', handleSocketOpen);
@@ -149,6 +198,7 @@ function connect() {
 }
 
 function scheduleReconnect() {
+  publishStatus({ state: 'disconnected', detail: '未连接，等待本地服务后自动重试' });
   if (reconnectTimer) return;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;

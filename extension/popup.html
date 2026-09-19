@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chrome MCP Bridge</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <div>
+          <p class="eyebrow">CODEX BRIDGE</p>
+          <h1>Chrome MCP Bridge</h1>
+        </div>
+        <span id="state-dot" class="state-dot"></span>
+      </header>
+
+      <section class="status-card">
+        <div class="status-line">
+          <span id="state-label">正在读取状态…</span>
+          <span id="updated-at" class="muted"></span>
+        </div>
+        <p id="state-detail" class="detail">扩展正在准备连接。</p>
+      </section>
+
+      <section class="info-card">
+        <div class="section-title">监听地址</div>
+        <code id="bridge-url">ws://127.0.0.1:17376/extension</code>
+        <p class="hint">Codex 通过此本地 WebSocket 与扩展通信。</p>
+      </section>
+
+      <section class="info-card">
+        <div class="section-title">最近动作</div>
+        <p id="last-action" class="empty">暂未收到 Codex 请求</p>
+        <p id="last-response" class="response"></p>
+      </section>
+
+      <footer>
+        <span>本地连接 · 不上传浏览器数据</span>
+        <button id="refresh" type="button" title="刷新状态">刷新</button>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

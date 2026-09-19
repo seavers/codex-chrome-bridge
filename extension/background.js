@@ -98,6 +98,12 @@ if (chrome.debugger?.onEvent) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === 'codex-bridge-status') {
+    updateActionStatus(message.status || {});
+    sendResponse({ ok: true });
+    return undefined;
+  }
+
   if (message?.type === 'codex-bridge-get-user-prompt') {
     sendResponse(userPromptResponse(message.requestId));
     return undefined;
@@ -128,6 +134,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   return true;
 });
+
+function updateActionStatus(status) {
+  const state = status.state || 'idle';
+  const badge = state === 'connected' ? 'OK' : state === 'error' ? 'ERR' : '';
+  const color = state === 'connected' ? '#188038' : state === 'error' ? '#d93025' : '#5f6368';
+
+  chrome.action.setBadgeText({ text: badge }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ color }).catch(() => {});
+  chrome.action.setTitle({
+    title: status.detail ? `Chrome MCP Bridge：${status.detail}` : 'Chrome MCP Bridge',
+  }).catch(() => {});
+}
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   handlePromptTabRemoved(tabId);
