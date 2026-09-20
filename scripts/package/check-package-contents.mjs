@@ -146,6 +146,8 @@ const REQUIRED_PACKAGE_FILES = Object.freeze([
   'scripts/checks/release/check-maintainability.mjs',
   'scripts/service/install-launch-agent.mjs',
   'scripts/service/uninstall-launch-agent.mjs',
+  'scripts/service/install-native-host.mjs',
+  'scripts/service/uninstall-native-host.mjs',
   'README.md',
   'llms.txt',
   'CHANGELOG.md',

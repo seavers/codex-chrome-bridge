@@ -8,7 +8,7 @@ Chrome MCP Bridge is a local real-profile bridge. It is designed for agents that
 
 The default provider is the local real-profile provider:
 
-- It talks to a local bridge server bound to `127.0.0.1`.
+- It talks to the local Native Messaging Host through the per-user Unix Socket; the legacy loopback server is explicit compatibility mode only.
 - It relies on the user's unpacked Chrome extension.
 - It keeps browser state in the user's Chrome profile.
 - It writes optional artifacts to local paths chosen by the caller.

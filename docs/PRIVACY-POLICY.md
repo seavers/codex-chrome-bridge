@@ -7,7 +7,7 @@ Chrome MCP Bridge is a local Chrome extension, bridge daemon, CLI, and MCP serve
 ## What The Software Does
 
 - Reads and interacts with Chrome tabs that the user explicitly scopes into the bridge workflow.
-- Exchanges data between the Chrome extension and the local bridge server over loopback.
+- Exchanges data between the Chrome extension and the local Native Messaging Host through a per-user Unix Socket.
 - Writes optional local artifacts such as JSON summaries, screenshots, PDFs, and debug bundles when the user requests them.
 
 ## Data Handling

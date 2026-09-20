@@ -31,8 +31,9 @@ import {
 } from '../../shared/fetch-timeout.mjs';
 import { formatReadOutput } from '../../shared/output-envelope.mjs';
 import { withSessionGroupTitle } from '../../shared/session-group-title.mjs';
+import { bridgeSocketPath, nativeBridgeRequest } from '../../shared/native-bridge.mjs';
 
-const BRIDGE_URL = process.env.CHROME_BRIDGE_URL || 'http://127.0.0.1:17376';
+const BRIDGE_URL = process.env.CHROME_BRIDGE_URL || `unix://${bridgeSocketPath()}`;
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const execFileAsync = promisify(execFile);
 
@@ -89,12 +90,16 @@ const fullPageReadSchema = {
 };
 
 async function bridgeFetch(pathname, options = {}, timeoutMs = 30_000) {
+  if (BRIDGE_URL.startsWith('unix://')) {
+    if (pathname === '/health') return nativeBridgeRequest({ type: 'health' }, timeoutMs);
+    if (pathname !== '/command') throw new Error(`Unsupported native bridge path: ${pathname}`);
+    let body;
+    try { body = JSON.parse(options.body || '{}'); } catch { throw new Error('Invalid bridge command body'); }
+    return nativeBridgeRequest({ type: 'command', action: body.action, payload: body.payload || {} }, timeoutMs);
+  }
   let response;
   try {
-    response = await fetch(`${BRIDGE_URL}${pathname}`, {
-      ...options,
-      signal: options.signal || bridgeFetchTimeoutSignal(timeoutMs),
-    });
+    response = await fetch(`${BRIDGE_URL}${pathname}`, { ...options, signal: options.signal || bridgeFetchTimeoutSignal(timeoutMs) });
   } catch (error) {
     if (isAbortError(error)) {
       const timeoutError = new Error(`Bridge request timed out after ${timeoutMs} ms`);
@@ -105,11 +110,7 @@ async function bridgeFetch(pathname, options = {}, timeoutMs = 30_000) {
   }
   const text = await response.text();
   let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`Bridge returned non-JSON ${response.status}: ${text.slice(0, 500)}`);
-  }
+  try { json = JSON.parse(text); } catch { throw new Error(`Bridge returned non-JSON ${response.status}: ${text.slice(0, 500)}`); }
   if (!response.ok || json.ok === false) {
     const error = new Error(json.error || `Bridge returned HTTP ${response.status}`);
     error.code = json.code;
@@ -708,7 +709,7 @@ function quickstartResourceText() {
     '# Chrome MCP Bridge Quickstart',
     '',
     '1. Load the unpacked Chrome extension from `extension/`.',
-    '2. Start the bridge server with `npm run server` or the installed daemon.',
+    '2. Install the Native Messaging Host with `npm run install:native-host -- <extension-id>`; no bridge daemon is required.',
     '3. Configure your MCP client with `chrome-bridge mcp-config` or `chrome_bridge_mcp_config`.',
     '4. Start every workflow with `chrome_bridge_health` and `chrome_bridge_workspace`.',
     '5. If the target page is already open, ask the user to focus it and use `chrome_bridge_adopt_tab` with `confirmed: true`.',

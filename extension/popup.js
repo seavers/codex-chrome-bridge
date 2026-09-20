@@ -1,7 +1,7 @@
 const DEFAULT_STATUS = {
   state: 'disconnected',
   detail: '尚未连接到本地服务',
-  bridgeUrl: 'ws://127.0.0.1:17376/extension',
+  bridgeUrl: 'unix:///tmp/codex-chrome-bridge.sock',
 };
 
 const ACTION_LABELS = {

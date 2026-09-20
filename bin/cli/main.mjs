@@ -6,6 +6,7 @@ import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { parseBridgePort, startBridgeServer } from '../../server/bridge-server.mjs';
+import { bridgeSocketPath, nativeBridgeRequest } from '../../shared/native-bridge.mjs';
 import { buildCpaOfferExtraction } from '../../shared/cpa-offer-extract.mjs';
 import { buildStructuredPresetExtraction } from '../../shared/structured-extract.mjs';
 import { buildDownloadDiscovery } from '../../shared/download-discovery.mjs';
@@ -58,7 +59,7 @@ import {
   commandDefaultTimeoutMs,
 } from '../../shared/command-registry.mjs';
 
-const DEFAULT_ENDPOINT = process.env.CHROME_BRIDGE_URL || 'http://127.0.0.1:17376';
+const DEFAULT_ENDPOINT = process.env.CHROME_BRIDGE_URL || `unix://${bridgeSocketPath()}`;
 const EXPECTED_EXTENSION_VERSION = BRIDGE_VERSION;
 let suppressSessionGroupTitle = false;
 
@@ -309,12 +310,16 @@ async function actApply(args = {}) {
 }
 
 async function bridgeFetch(pathname, options = {}, timeoutMs = 30_000) {
+  if (DEFAULT_ENDPOINT.startsWith('unix://')) {
+    if (pathname === '/health') return nativeBridgeRequest({ type: 'health' }, timeoutMs);
+    if (pathname !== '/command') throw new Error(`Unsupported native bridge path: ${pathname}`);
+    let body;
+    try { body = JSON.parse(options.body || '{}'); } catch { throw new Error('Invalid bridge command body'); }
+    return nativeBridgeRequest({ type: 'command', action: body.action, payload: body.payload || {} }, timeoutMs);
+  }
   let response;
   try {
-    response = await fetch(`${DEFAULT_ENDPOINT}${pathname}`, {
-      ...options,
-      signal: options.signal || bridgeFetchTimeoutSignal(timeoutMs),
-    });
+    response = await fetch(`${DEFAULT_ENDPOINT}${pathname}`, { ...options, signal: options.signal || bridgeFetchTimeoutSignal(timeoutMs) });
   } catch (error) {
     if (isAbortError(error)) {
       const timeoutError = new Error(`Bridge request timed out after ${timeoutMs} ms`);
@@ -325,11 +330,7 @@ async function bridgeFetch(pathname, options = {}, timeoutMs = 30_000) {
   }
   const text = await response.text();
   let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`Bridge returned non-JSON ${response.status}: ${text.slice(0, 500)}`);
-  }
+  try { json = JSON.parse(text); } catch { throw new Error(`Bridge returned non-JSON ${response.status}: ${text.slice(0, 500)}`); }
   if (!response.ok || json.ok === false) {
     const error = new Error(json.error || `Bridge returned HTTP ${response.status}`);
     error.code = json.code;

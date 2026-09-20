@@ -98,7 +98,7 @@ The bridge server binds to `127.0.0.1` by default. Do not expose it on a public 
 
 Streamable HTTP is not implemented in this release. Any future Streamable HTTP MCP endpoint must be opt-in, keep `127.0.0.1` as the default bind address, validate `Origin` to defend against DNS rebinding, and require authentication plus TLS before any non-loopback or remotely reachable deployment. See [STREAMABLE-HTTP.md](STREAMABLE-HTTP.md).
 
-The extension uses the WebSocket transport by default. Extension ingress requires a `chrome-extension://` origin for both WebSocket and the optional HTTP fallback. When an extension reports `extensionId`, the server verifies that it matches the extension origin and keeps optional fallback poll requests pinned to the known extension id. The HTTP long-poll extension fallback is disabled unless `CHROME_BRIDGE_ENABLE_LONG_POLL=1` is explicitly set for compatibility testing.
+The extension uses Chrome Native Messaging plus a per-user Unix Socket by default. The legacy WebSocket/HTTP transport remains available only when an explicit `CHROME_BRIDGE_URL=http://...` is configured; its extension-origin, extension-id, and long-poll safety gates remain unchanged for compatibility testing.
 
 The server exposes CORS only on extension ingress paths. It rejects unsupported actions, direct `/command` requests that carry browser or extension origins, non-`application/json` JSON POSTs, malformed direct `/command` JSON bodies, unknown top-level command fields, payloads, top-level timeouts, and non-loopback bind attempts unless `CHROME_BRIDGE_UNSAFE_HOST=1` is explicitly set after a security review.
 

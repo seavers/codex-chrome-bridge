@@ -10,10 +10,10 @@ For client-specific install shortcuts, see [INSTALL.md](INSTALL.md). For Chrome 
 2. Enable Developer mode.
 3. Click "Load unpacked".
 4. Select the `extension/` folder from this repository.
-5. Start the bridge server:
+5. Install the Native Messaging Host using the extension ID shown in `chrome://extensions/`:
 
 ```bash
-npm run server
+npm run install:native-host -- <extension-id>
 ```
 
 6. Check health:
@@ -22,7 +22,7 @@ npm run server
 node ./bin/chrome-bridge.mjs health
 ```
 
-The extension is ready when `extension.connected` is `true` and `extension.info.version` matches `package.json`.
+The extension is ready when `extension.connected` is `true`, `extension.info.version` matches `package.json`, and the health response reports `native-messaging+unix-socket`.
 
 ## Packaging
 

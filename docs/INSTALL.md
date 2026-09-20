@@ -7,7 +7,7 @@ Chrome MCP Bridge can be installed in under five minutes if you follow the clien
 1. Install Node.js 20 or newer.
 2. Run `npm install`.
 3. Load unpacked `extension/` in `chrome://extensions/`.
-4. Start the bridge server with `npm run server`.
+4. Copy the extension ID from `chrome://extensions/` and install the Native Messaging Host with `npm run install:native-host -- <extension-id>`.
 5. Generate a client snippet with `node ./bin/chrome-bridge.mjs mcp-config --client <name>` or write a project-local file with `node ./bin/chrome-bridge.mjs mcp-write --client <name>`.
 6. Verify the live setup with:
 

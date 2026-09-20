@@ -29,23 +29,24 @@ The `extension/` directory contains a Manifest V3 extension:
 - `user-prompts.js` owns human-in-the-loop prompt state, prompt tab lifecycle, and answer completion.
 - `workspace-policy.js` owns local workspace defaults and scoped policy normalization.
 - `workspace-tabs.js` owns scoped workspace tab/group targeting and extension-local workspace storage state, including the bounded remembered-title list used by tab-group persistence sweeps and Chrome session storage for browser-session group IDs.
-- `offscreen.html` and `offscreen.js` keep a WebSocket connection to the local bridge server.
+- `offscreen.html` and `offscreen.js` connect to `com.codex.chrome_bridge` through Chrome Native Messaging and relay requests to the local Unix Socket.
 - `ask.html` and `ask.js` provide a local human-in-the-loop prompt page.
 
 The extension is the only component that talks directly to Chrome extension APIs.
 
-## Local Bridge Server
+## Native Messaging Host
 
-`server/bridge-server.mjs` starts a local HTTP/WebSocket server on `127.0.0.1:17376` by default.
+`native/host.mjs` is started by Chrome when the extension calls `chrome.runtime.connectNative()`. It owns the per-user Unix Socket at `/tmp/codex-chrome-bridge.sock` and relays newline-delimited CLI/MCP requests to the extension over Native Messaging.
 
 It exposes:
 
-- `GET /health` for diagnostics.
-- `POST /command` for CLI/MCP commands.
-- `/extension` WebSocket for the extension; upgrade requests must carry a `chrome-extension://` origin and hello messages with `extensionId` must match that origin.
-- Long-poll fallback endpoints for the extension, disabled by default and only enabled with `CHROME_BRIDGE_ENABLE_LONG_POLL=1`; fallback requests must also carry a `chrome-extension://` origin and matching `extensionId` when reported.
+- `health` socket requests for diagnostics.
+- `command` socket requests for CLI/MCP commands.
+- Native Messaging frames between Chrome and the extension.
 
-The bridge server does not persist browser data.
+Install the host manifest once with `npm run install:native-host -- <extension-id>`. The extension ID is the ID shown for the unpacked extension in `chrome://extensions/`. The host does not persist browser data.
+
+`server/bridge-server.mjs` remains as an explicit legacy HTTP/WebSocket compatibility server for isolated contract tests and callers that set `CHROME_BRIDGE_URL=http://...`; it is not started by the default CLI/MCP path.
 
 The server keeps a per-profile extension client map instead of a single global extension socket. The extension hello includes a stable per-Chrome-profile `profileId` stored in `chrome.storage.local`, plus the older `clientId` fallback. `/health` preserves the legacy `extension` summary and also exposes `extensions[]` with each connected profile. When more than one profile is connected, `/command` fails closed with `AMBIGUOUS_EXTENSION_PROFILE` unless the caller supplies routing-only `payload.profileId`; CLI and MCP wrappers add that field automatically from `CHROME_BRIDGE_PROFILE_ID`. The routing field is stripped before extension dispatch, so extension action handlers only see their normal action payload.
 
@@ -80,7 +81,7 @@ The extension still owns Chrome API execution, but the server allowlist, runtime
 
 ## CLI
 
-`bin/chrome-bridge.mjs` is the stable user-facing command-line binary. It delegates to `bin/cli/main.mjs`, which sends commands to the local bridge server and prints JSON results.
+`bin/chrome-bridge.mjs` is the stable user-facing command-line binary. It delegates to `bin/cli/main.mjs`, which sends commands to the Native Messaging Host's Unix Socket and prints JSON results.
 
 It also contains:
 
@@ -98,15 +99,16 @@ The MCP server supports `CHROME_BRIDGE_MCP_TOOL_PROFILE=full|core|read`. The def
 The MCP server is intentionally thin:
 
 - It validates tool arguments with Zod.
-- It forwards commands to the local bridge server.
+- It forwards commands to the Native Messaging Host's Unix Socket.
 - It returns JSON as MCP text content.
 
 ## Data Flow
 
 ```text
 MCP client or CLI
-  -> local bridge server on 127.0.0.1
-  -> Chrome extension WebSocket
+  -> Unix Socket /tmp/codex-chrome-bridge.sock
+  -> Native Messaging Host
+  -> Chrome extension Native Messaging port
   -> Chrome extension APIs / page scripts / Chrome Debugger
   -> result back through the same path
 ```

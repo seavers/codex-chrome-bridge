@@ -29,7 +29,7 @@ If you want the shortest per-client setup path first, start with [INSTALL.md](IN
 1. Install Node.js 20 or newer.
 2. Install dependencies with `npm install`.
 3. Load the unpacked Chrome extension from `extension/`.
-4. Start the bridge server with `npm run server` or install the LaunchAgent on macOS.
+4. Install the Native Messaging Host with `npm run install:native-host -- <extension-id>` on macOS; the default CLI/MCP path does not require a daemon.
 5. Configure your MCP client to run `node /absolute/path/to/mcp/chrome-bridge-mcp.mjs`.
 
 Run these checks after setup:

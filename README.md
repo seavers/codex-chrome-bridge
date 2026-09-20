@@ -73,7 +73,7 @@ The default posture is intentionally conservative:
 - Whole-browser inventory reads such as `tabs --all`, `windows --all`, and MCP `includeAll: true` require explicit confirmation.
 - Mutating actions require `confirmed=true` or `--confirm`.
 - Cookie values, whole-cookie-jar access, storage values, and credentialed requests require `confirmSensitive=true` or `--confirm-sensitive`.
-- The bridge server binds to `127.0.0.1`.
+- The default transport is Chrome Native Messaging plus a per-user Unix socket at `/tmp/codex-chrome-bridge.sock`; no TCP bridge server is required.
 - If two Chrome profiles run the extension at the same time, `/health` reports every connected profile. Commands fail closed until the CLI or MCP process sets `CHROME_BRIDGE_PROFILE_ID` to the intended `profileId` or `clientId`.
 - Automatic CAPTCHA bypass is out of scope; use the human prompt for manual coordination.
 
@@ -86,7 +86,7 @@ git clone https://github.com/shutovdef-dotcom/codex-chrome-bridge.git
 cd codex-chrome-bridge
 npm install
 npm run check
-npm run server
+npm run install:native-host -- <unpacked-extension-id>
 ```
 
 In Chrome:
@@ -95,6 +95,8 @@ In Chrome:
 2. Enable Developer mode.
 3. Click "Load unpacked".
 4. Select this repository's `extension/` folder.
+
+The Native Messaging manifest must be installed once for the unpacked extension. Copy the extension ID shown by `chrome://extensions/` and pass it to the installer above. The extension then connects to Chrome's Native Messaging Host, which exposes only the local Unix socket to the CLI/MCP process.
 
 Verify the bridge:
 
@@ -278,20 +280,19 @@ Useful MCP tools:
 
 Full reference: [MCP](docs/MCP.md). Client setup guide: [MCP Client Compatibility](docs/COMPATIBILITY.md).
 
-## macOS Background Service
+## macOS Native Messaging Host
 
-Install the local bridge server as a LaunchAgent:
+Install the host manifest once. Chrome starts the Native Messaging Host when the extension connects; no LaunchAgent or manually managed TCP server is required:
 
 ```bash
-npm run install:launch-agent
-launchctl kickstart -k "gui/$(id -u)/com.codex.chrome-bridge"
+npm run install:native-host -- <unpacked-extension-id>
 node ./bin/chrome-bridge.mjs health
 ```
 
 Uninstall:
 
 ```bash
-npm run uninstall:launch-agent
+npm run uninstall:native-host
 ```
 
 ## Project Layout
@@ -300,7 +301,8 @@ npm run uninstall:launch-agent
 bin/        CLI binary wrapper and CLI implementation modules
 extension/  Chrome Manifest V3 extension
 mcp/        MCP stdio binary wrapper and server implementation modules
-server/     local HTTP/WebSocket bridge server
+native/     Chrome Native Messaging Host and Unix Socket relay
+server/     explicit legacy HTTP/WebSocket bridge server
 shared/     command registry, payload contracts, and cross-surface helpers
 scripts/    verification, packaging, docs, and macOS LaunchAgent helpers
 docs/       user and developer docs

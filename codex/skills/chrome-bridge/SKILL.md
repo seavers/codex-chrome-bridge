@@ -30,10 +30,12 @@ node "$CHROME_BRIDGE_ROOT/mcp/chrome-bridge-mcp.mjs"
 ## Startup
 
 ```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" server
+npm --prefix "$CHROME_BRIDGE_ROOT" run install:native-host -- <extension-id>
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" health
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" doctor --open-extensions
 ```
+
+The default CLI/MCP transport is Chrome Native Messaging plus `/tmp/codex-chrome-bridge.sock`. Do not start a bridge daemon for normal use. The legacy HTTP/WebSocket server is only for explicit compatibility checks with `CHROME_BRIDGE_URL=http://...`.
 
 Load the unpacked Chrome extension from:
 

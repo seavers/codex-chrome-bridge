@@ -55,7 +55,7 @@ Developer Tools
 - Ads: no advertising.
 - Sale of data: no sale, transfer, or brokerage of user data.
 - External backend: no hosted backend for browser activity.
-- Local network: communicates with the local bridge server on `127.0.0.1`.
+- Local network: communicates with the local Native Messaging Host through the per-user Unix Socket.
 - User content: page content may be read locally by explicit CLI/MCP commands.
 - Authentication data: cookies can be read only through confirmed sensitive commands; the default browser workflow does not expose cookie values.
 - File contents: downloads return local file metadata only; file contents are not uploaded or inlined by default.
