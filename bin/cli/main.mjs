@@ -5,8 +5,7 @@ import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { parseBridgePort, startBridgeServer } from '../../server/bridge-server.mjs';
-import { bridgeSocketPath, nativeBridgeRequest } from '../../shared/native-bridge.mjs';
+import { bridgeSocketPath, nativeBridgeCommand, nativeBridgeHealth } from '../../shared/native-bridge.mjs';
 import { buildCpaOfferExtraction } from '../../shared/cpa-offer-extract.mjs';
 import { buildStructuredPresetExtraction } from '../../shared/structured-extract.mjs';
 import { buildDownloadDiscovery } from '../../shared/download-discovery.mjs';
@@ -25,10 +24,6 @@ import {
 } from '../../shared/act-preview-state.mjs';
 import { buildToolAdvisor } from '../../shared/tool-advisor.mjs';
 import { appendActionRecording, summarizeActionRecording } from '../../shared/action-recording.mjs';
-import {
-  bridgeFetchTimeoutSignal,
-  isAbortError,
-} from '../../shared/fetch-timeout.mjs';
 import {
   formatReadOutput,
   lastArtifact,
@@ -59,7 +54,7 @@ import {
   commandDefaultTimeoutMs,
 } from '../../shared/command-registry.mjs';
 
-const DEFAULT_ENDPOINT = process.env.CHROME_BRIDGE_URL || `unix://${bridgeSocketPath()}`;
+const BRIDGE_TRANSPORT = 'native-messaging+unix-socket';
 const EXPECTED_EXTENSION_VERSION = BRIDGE_VERSION;
 let suppressSessionGroupTitle = false;
 
@@ -310,34 +305,11 @@ async function actApply(args = {}) {
 }
 
 async function bridgeFetch(pathname, options = {}, timeoutMs = 30_000) {
-  if (DEFAULT_ENDPOINT.startsWith('unix://')) {
-    if (pathname === '/health') return nativeBridgeRequest({ type: 'health' }, timeoutMs);
-    if (pathname !== '/command') throw new Error(`Unsupported native bridge path: ${pathname}`);
-    let body;
-    try { body = JSON.parse(options.body || '{}'); } catch { throw new Error('Invalid bridge command body'); }
-    return nativeBridgeRequest({ type: 'command', action: body.action, payload: body.payload || {} }, timeoutMs);
-  }
-  let response;
-  try {
-    response = await fetch(`${DEFAULT_ENDPOINT}${pathname}`, { ...options, signal: options.signal || bridgeFetchTimeoutSignal(timeoutMs) });
-  } catch (error) {
-    if (isAbortError(error)) {
-      const timeoutError = new Error(`Bridge request timed out after ${timeoutMs} ms`);
-      timeoutError.code = 'BRIDGE_FETCH_TIMEOUT';
-      throw timeoutError;
-    }
-    throw error;
-  }
-  const text = await response.text();
-  let json;
-  try { json = JSON.parse(text); } catch { throw new Error(`Bridge returned non-JSON ${response.status}: ${text.slice(0, 500)}`); }
-  if (!response.ok || json.ok === false) {
-    const error = new Error(json.error || `Bridge returned HTTP ${response.status}`);
-    error.code = json.code;
-    error.details = json.details;
-    throw error;
-  }
-  return json;
+  if (pathname === '/health') return nativeBridgeHealth(timeoutMs);
+  if (pathname !== '/command') throw new Error(`Unsupported native bridge path: ${pathname}`);
+  let body;
+  try { body = JSON.parse(options.body || '{}'); } catch { throw new Error('Invalid bridge command body'); }
+  return nativeBridgeCommand(body.action, body.payload || {}, timeoutMs);
 }
 
 async function command(action, payload = {}, timeoutMs) {
@@ -1105,7 +1077,7 @@ function mcpConfigText(args = {}) {
     '# Chrome MCP Bridge client configuration',
     '',
     'These snippets start the local stdio MCP server with the current Node executable.',
-    'Install and load the Chrome extension, then run the bridge server before using live browser tools.',
+    'Install and load the Chrome extension, then install the Native Messaging Host before using live browser tools.',
     client === 'all'
       ? 'Default recommendations: `full` for Claude Code, Codex, VS Code, and Hermes; `core` for Cursor and Windsurf; `read` as the conservative generic fallback.'
       : `Recommended profile for this client: \`${recommendedProfile}\`.`,
@@ -1432,7 +1404,7 @@ async function doctor(args) {
   }
 
   const extensionConnected = includeLiveChecks ? Boolean(health?.extension?.connected) : null;
-  const bridgeVersion = health?.bridge?.version || null;
+  const bridgeVersion = health?.bridge?.version || health?.extension?.info?.version || null;
   const bridgeCurrent = includeLiveChecks ? bridgeVersion === EXPECTED_EXTENSION_VERSION : null;
   const extensionVersion = health?.extension?.info?.version || null;
   const extensionCurrent = includeLiveChecks ? extensionVersion === EXPECTED_EXTENSION_VERSION : null;
@@ -1448,7 +1420,8 @@ async function doctor(args) {
   };
 
   return {
-    bridgeUrl: DEFAULT_ENDPOINT,
+    bridgeTransport: BRIDGE_TRANSPORT,
+    socketPath: bridgeSocketPath(),
     extensionPath,
     liveChecks: includeLiveChecks,
     health,
@@ -1473,8 +1446,8 @@ async function doctor(args) {
       'Pass --live-checks only when no other Codex session is actively using the bridge.',
       'Run chrome-bridge health and runtime-smoke later for final live verification.',
     ] : bridgeCurrent === false ? [
-      `Restart the local Chrome Bridge server; expected ${EXPECTED_EXTENSION_VERSION}, got ${bridgeVersion || 'unknown'}.`,
-      'Run chrome-bridge doctor --live-checks again after restarting the bridge server.',
+      `Restart the Native Messaging Host; expected ${EXPECTED_EXTENSION_VERSION}, got ${bridgeVersion || 'unknown'}.`,
+      'Run chrome-bridge doctor --live-checks again after restarting the Native Messaging Host.',
     ] : extensionConnected && extensionCurrent ? [
       'Run chrome-bridge runtime-smoke for full local runtime verification.',
       'Run ensure-tab/open/snapshot/screenshot commands for task-specific work.',
@@ -1567,7 +1540,7 @@ async function selfTest() {
     workspacePolicy: path.join(rootDir, 'extension/workspace-policy.js'),
     workspaceTabs: path.join(rootDir, 'extension/workspace-tabs.js'),
     ask: path.join(rootDir, 'extension/ask.js'),
-    server: path.join(rootDir, 'server/bridge-server.mjs'),
+    nativeHost: path.join(rootDir, 'native/host.mjs'),
     cli: path.join(rootDir, 'bin/chrome-bridge.mjs'),
     cliMain: path.join(rootDir, 'bin/cli/main.mjs'),
     mcp: path.join(rootDir, 'mcp/chrome-bridge-mcp.mjs'),
@@ -1590,7 +1563,6 @@ async function selfTest() {
     sessionGroupTitle: path.join(rootDir, 'shared/session-group-title.mjs'),
     commandCatalogDoc: path.join(rootDir, 'docs/COMMAND-CATALOG.md'),
     commandCatalogGenerator: path.join(rootDir, 'scripts/docs/generate-command-catalog.mjs'),
-    bridgeContractChecker: path.join(rootDir, 'scripts/checks/contracts/check-bridge-contract.mjs'),
     docsCoverageChecker: path.join(rootDir, 'scripts/docs/check-docs-coverage.mjs'),
     packageContentsChecker: path.join(rootDir, 'scripts/package/check-package-contents.mjs'),
     registrySourceHelper: path.join(rootDir, 'scripts/checks/lib/registry-source.mjs'),
@@ -1635,7 +1607,6 @@ async function selfTest() {
     fetchTimeout,
     safeRecord,
     commandCatalogDoc,
-    bridgeContractChecker,
     packageJsonText,
     packageLockText,
   ] = await Promise.all([
@@ -1662,7 +1633,7 @@ async function selfTest() {
     fs.readFile(paths.workspacePolicy, 'utf8'),
     fs.readFile(paths.workspaceTabs, 'utf8'),
     fs.readFile(paths.ask, 'utf8'),
-    fs.readFile(paths.server, 'utf8'),
+    fs.readFile(paths.nativeHost, 'utf8'),
     readSelfTestCliSource(paths),
     readSelfTestMcpSource(paths),
     readSelfTestRegistrySource(paths),
@@ -1673,7 +1644,6 @@ async function selfTest() {
     fs.readFile(paths.fetchTimeout, 'utf8'),
     fs.readFile(paths.safeRecord, 'utf8'),
     fs.readFile(paths.commandCatalogDoc, 'utf8'),
-    fs.readFile(paths.bridgeContractChecker, 'utf8'),
     fs.readFile(paths.packageJson, 'utf8'),
     fs.readFile(paths.packageLock, 'utf8'),
   ]);
@@ -1706,7 +1676,7 @@ async function selfTest() {
     tryExec(process.execPath, ['--check', paths.workspacePolicy]),
     tryExec(process.execPath, ['--check', paths.workspaceTabs]),
     tryExec(process.execPath, ['--check', paths.ask]),
-    tryExec(process.execPath, ['--check', paths.server]),
+    tryExec(process.execPath, ['--check', paths.nativeHost]),
     tryExec(process.execPath, ['--check', paths.cli]),
     tryExec(process.execPath, ['--check', paths.cliMain]),
     tryExec(process.execPath, ['--check', paths.mcp]),
@@ -1728,7 +1698,6 @@ async function selfTest() {
     tryExec(process.execPath, ['--check', paths.safeRecord]),
     tryExec(process.execPath, ['--check', paths.sessionGroupTitle]),
     tryExec(process.execPath, ['--check', paths.commandCatalogGenerator]),
-    tryExec(process.execPath, ['--check', paths.bridgeContractChecker]),
     tryExec(process.execPath, ['--check', paths.docsCoverageChecker]),
     tryExec(process.execPath, ['--check', paths.packageContentsChecker]),
     tryExec(process.execPath, ['--check', paths.registrySourceHelper]),
@@ -1876,25 +1845,13 @@ async function selfTest() {
     {
       label: 'registry',
       item: 'runtime timeout defaults',
-      ok: server.includes('commandDefaultTimeoutMs')
-        && server.includes('return commandDefaultTimeoutMs(action)')
-        && server.includes('commandTimeoutMs(action, timeoutMs)')
-        && cli.includes('timeoutMs ?? commandDefaultTimeoutMs(action)')
+      ok: cli.includes('timeoutMs ?? commandDefaultTimeoutMs(action)')
         && mcp.includes('timeoutMs ?? commandDefaultTimeoutMs(action)'),
-    },
-    {
-      label: 'shared helper',
-      item: 'abortable bridge fetch helper',
-      ok: fetchTimeout.includes('bridgeFetchTimeoutSignal')
-        && fetchTimeout.includes('AbortSignal.timeout')
-        && cli.includes('bridgeFetchTimeoutSignal')
-        && mcp.includes('bridgeFetchTimeoutSignal'),
     },
     {
       label: 'shared helper',
       item: 'unsafe object key stripping',
       ok: safeRecord.includes('stripUnsafeObjectKeys')
-        && server.includes('stripUnsafeObjectKeys(info')
         && runTabs.includes('stripUnsafeObjectKeys(meta'),
     },
     {
@@ -1940,32 +1897,7 @@ async function selfTest() {
     { label: 'safety gate', item: 'requireSensitiveConfirmed', ok: safetyGates.includes('function requireSensitiveConfirmed') },
     { label: 'safety gate', item: 'whole cookie jar confirmSensitive', ok: browserData.includes("cookiesList without url/domain/name") },
     { label: 'safety gate', item: 'credentialed request confirmSensitive', ok: browserData.includes("credentials === 'include'") },
-    { label: 'bridge guard', item: 'unsupported action rejection', ok: server.includes('Unsupported action:') },
-    { label: 'bridge guard', item: 'extension version mismatch rejection', ok: server.includes('Extension version mismatch:') },
-    { label: 'bridge guard', item: 'unknown extension version rejection', ok: server.includes('VERSION_UNKNOWN') && server.includes('extensionVersionStatusError') },
-    { label: 'bridge guard', item: 'long poll disabled by default', ok: server.includes('CHROME_BRIDGE_ENABLE_LONG_POLL') },
-    { label: 'bridge guard', item: 'server payload validation', ok: server.includes('validateCommandPayload') && registry.includes('COMMAND_PAYLOAD_SCHEMAS') },
-    { label: 'bridge guard', item: 'direct command origin rejection', ok: server.includes('requireCommandOrigin') && server.includes('INVALID_COMMAND_ORIGIN') },
-    { label: 'bridge guard', item: 'JSON POST content-type rejection', ok: server.includes('requireJsonContentType') && server.includes('UNSUPPORTED_MEDIA_TYPE') },
-    { label: 'bridge guard', item: 'extension origin/id parity', ok: server.includes('requireExtensionIdentity') && server.includes('EXTENSION_ID_MISMATCH') },
-    { label: 'bridge guard', item: 'unsafe host guard', ok: server.includes('CHROME_BRIDGE_UNSAFE_HOST') },
     { label: 'safety gate', item: 'extension request method allowlist', ok: registry.includes('HTTP_METHODS') && cli.includes('normalizeHttpMethod') && mcp.includes('z.enum(HTTP_METHODS)') },
-    {
-      label: 'bridge guard',
-      item: 'shutdown cleanup',
-      ok: server.includes('BRIDGE_SHUTTING_DOWN')
-        && server.includes('rejectPendingCommands')
-        && server.includes('closeWebSocketServer')
-        && bridgeContractChecker.includes('rejects pending commands during shutdown')
-        && bridgeContractChecker.includes('closes websocket extension sockets during shutdown'),
-    },
-    {
-      label: 'bridge guard',
-      item: 'structured oversized body rejection',
-      ok: server.includes('REQUEST_TOO_LARGE')
-        && server.includes('let settled = false')
-        && bridgeContractChecker.includes('rejects oversized JSON request bodies with structured 413'),
-    },
     {
       label: 'bridge guard',
       item: 'debugger actions serialized per tab',
@@ -2012,9 +1944,8 @@ async function selfTest() {
       item: 'extension error codes propagate through bridge',
       ok: extensionErrors.includes('function extensionErrorCode')
         && background.includes('code: extensionErrorCode(error)')
-        && server.includes('body.code ||')
-        && cli.includes('error.details = json.details')
-        && mcp.includes('error.details = json.details'),
+        && cli.includes('nativeBridgeCommand')
+        && mcp.includes('nativeBridgeCommand'),
     },
   ];
 
@@ -2044,7 +1975,7 @@ async function selfTest() {
         paths.workspacePolicy,
         paths.workspaceTabs,
         paths.ask,
-        paths.server,
+        paths.nativeHost,
         paths.cli,
         paths.mcp,
         paths.registry,
@@ -2273,7 +2204,8 @@ async function sessionSummary() {
   }));
   return {
     generatedAt: new Date().toISOString(),
-    bridgeUrl: DEFAULT_ENDPOINT,
+    bridgeTransport: BRIDGE_TRANSPORT,
+    socketPath: bridgeSocketPath(),
     health,
     workspace,
     group,
@@ -2284,11 +2216,11 @@ async function sessionSummary() {
 
 function summaryRecommendations(health, group, workspace) {
   const recommendations = [];
-  const bridgeVersion = health?.bridge?.version;
+  const bridgeVersion = health?.bridge?.version || health?.extension?.info?.version;
   const extensionVersion = health?.extension?.info?.version;
   const policyMode = workspace?.policy?.mode || workspace?.workspace?.policyMode;
   if (bridgeVersion && bridgeVersion !== EXPECTED_EXTENSION_VERSION) {
-    recommendations.push(`Restart the local Chrome Bridge server; expected ${EXPECTED_EXTENSION_VERSION}, got ${bridgeVersion}.`);
+    recommendations.push(`Restart the Native Messaging Host; expected ${EXPECTED_EXTENSION_VERSION}, got ${bridgeVersion}.`);
   }
   if (extensionVersion && extensionVersion !== EXPECTED_EXTENSION_VERSION) {
     recommendations.push(`Reload the unpacked extension; expected ${EXPECTED_EXTENSION_VERSION}, got ${extensionVersion}.`);
@@ -2307,14 +2239,14 @@ function summaryRecommendations(health, group, workspace) {
 
 function summaryNextActions(health, group, workspace) {
   const actions = [];
-  const bridgeVersion = health?.bridge?.version;
+  const bridgeVersion = health?.bridge?.version || health?.extension?.info?.version;
   const extensionVersion = health?.extension?.info?.version;
   const extensionConnected = Boolean(health?.extension?.connected);
   const policyMode = workspace?.policy?.mode || workspace?.workspace?.policyMode;
   const hasScopedTabs = Boolean((workspace?.counts?.tabs > 0) || (Array.isArray(group?.tabs) && group.tabs.length));
 
   if (bridgeVersion && bridgeVersion !== EXPECTED_EXTENSION_VERSION) {
-    actions.push('Restart the local Chrome Bridge server, then run chrome-bridge doctor --live-checks.');
+    actions.push('Restart the Native Messaging Host, then run chrome-bridge doctor --live-checks.');
     return actions;
   }
   if (extensionVersion && extensionVersion !== EXPECTED_EXTENSION_VERSION) {
@@ -2414,7 +2346,7 @@ const RUNTIME_SMOKE_FINAL_MCP_CALLS = Object.freeze([
 ]);
 
 const RUNTIME_SMOKE_RELOAD_EXTENSION_ACTION = 'Reload the unpacked Chrome MCP Bridge extension, then run chrome-bridge doctor --live-checks.';
-const RUNTIME_SMOKE_RESTART_BRIDGE_ACTION = 'Restart the local Chrome Bridge server, then run chrome-bridge doctor --live-checks.';
+const RUNTIME_SMOKE_RESTART_BRIDGE_ACTION = 'Restart the Native Messaging Host, then run chrome-bridge doctor --live-checks.';
 const RUNTIME_SMOKE_RERUN_ACTION = 'Review the smoke failures, fix the issue, then run chrome-bridge runtime-smoke again.';
 
 function runtimeSmokeFinalMcpCalls() {
@@ -2598,7 +2530,8 @@ async function debugBundle(args = {}) {
   const includeTraceEvents = Boolean(args['include-trace-events']);
   const manifest = {
     createdAt,
-    bridgeUrl: DEFAULT_ENDPOINT,
+    bridgeTransport: BRIDGE_TRANSPORT,
+    socketPath: bridgeSocketPath(),
     files: [],
     privacy: {
       mode: 'redacted',
@@ -2690,7 +2623,7 @@ async function runtimeSmoke(args = {}) {
     return runtimeSmokeCoveragePlan(startedAt);
   }
   const health = await bridgeFetch('/health');
-  const bridgeVersion = health?.bridge?.version || null;
+  const bridgeVersion = health?.bridge?.version || health?.extension?.info?.version || null;
   if (bridgeVersion !== EXPECTED_EXTENSION_VERSION) {
     const verification = runtimeSmokeLiveVerification({ status: 'skipped', bridgeVersion });
     return {
@@ -2700,7 +2633,7 @@ async function runtimeSmoke(args = {}) {
       bridgeVersion,
       finalVerificationComplete: false,
       skipped: true,
-      reason: `Restart the local Chrome Bridge server first; live bridge version is ${bridgeVersion || 'unknown'}`,
+      reason: `Restart the Native Messaging Host first; live bridge version is ${bridgeVersion || 'unknown'}`,
       nextCommand: verification.nextCommand,
       nextAction: verification.nextAction,
       verification,
@@ -3289,19 +3222,6 @@ export async function main() {
 
   if (!cmd || cmd === '-h' || cmd === '--help' || cmd === 'help') {
     process.stdout.write(`${usage()}\n`);
-    return;
-  }
-
-  if (cmd === 'server') {
-    const port = parseBridgePort(args.port ?? process.env.CHROME_BRIDGE_PORT, 'port');
-    const bridge = await startBridgeServer({ port });
-    process.stdout.write(`Chrome bridge listening on http://${bridge.host}:${bridge.port}\n`);
-    process.stdout.write(`Load this unpacked extension in Chrome: ${path.join(rootDir, 'extension')}\n`);
-    process.stdout.write('Waiting for extension connection...\n');
-    process.on('SIGINT', async () => {
-      await bridge.close().catch(() => {});
-      process.exit(0);
-    });
     return;
   }
 

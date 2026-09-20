@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,7 @@ import { BRIDGE_VERSION } from '../../../shared/command-registry.mjs';
 const execFileAsync = promisify(execFile);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const cliPath = path.join(rootDir, 'bin/chrome-bridge.mjs');
-const deadBridgeUrl = 'http://127.0.0.1:9';
+const deadBridgeUrl = '/tmp/chrome-bridge-unavailable.sock';
 const failures = [];
 
 function fail(message) {
@@ -46,7 +46,7 @@ async function runCli(args, env = {}) {
 
 async function withStaleHealthServer(fn) {
   const staleExtensionVersion = '0.0.0-stale-extension';
-  const server = http.createServer((req, res) => {
+  const server = createFakeNativeBridge((req, res) => {
     if (req.url !== '/health') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -74,8 +74,8 @@ async function withStaleHealthServer(fn) {
   });
 
   try {
-    const { port } = server.address();
-    return await fn(`http://127.0.0.1:${port}`, staleExtensionVersion);
+    const { path: socketPath } = server.address();
+    return await fn(socketPath, staleExtensionVersion);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -83,7 +83,7 @@ async function withStaleHealthServer(fn) {
 
 async function withStaleBridgeHealthServer(fn) {
   const staleBridgeVersion = '0.0.0-stale-bridge';
-  const server = http.createServer((req, res) => {
+  const server = createFakeNativeBridge((req, res) => {
     if (req.url !== '/health') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -111,8 +111,8 @@ async function withStaleBridgeHealthServer(fn) {
   });
 
   try {
-    const { port } = server.address();
-    return await fn(`http://127.0.0.1:${port}`, staleBridgeVersion);
+    const { path: socketPath } = server.address();
+    return await fn(socketPath, staleBridgeVersion);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -120,7 +120,7 @@ async function withStaleBridgeHealthServer(fn) {
 
 let parsed;
 try {
-  const result = await runCli(['runtime-smoke', '--coverage-plan'], { CHROME_BRIDGE_URL: deadBridgeUrl });
+  const result = await runCli(['runtime-smoke', '--coverage-plan'], { CHROME_BRIDGE_SOCKET: deadBridgeUrl });
   if (!result.ok) throw new Error(result.error || result.stderr || 'coverage plan command failed');
   parsed = JSON.parse(result.stdout);
 } catch (error) {
@@ -190,7 +190,7 @@ if (parsed) {
 const summaryTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-bridge-runtime-smoke-summary-check-'));
 try {
   const out = path.join(summaryTmpDir, 'runtime-smoke-full.json');
-  const result = await runCli(['runtime-smoke', '--coverage-plan', '--summary-only', '--out', out], { CHROME_BRIDGE_URL: deadBridgeUrl });
+  const result = await runCli(['runtime-smoke', '--coverage-plan', '--summary-only', '--out', out], { CHROME_BRIDGE_SOCKET: deadBridgeUrl });
   let summaryParsed = null;
   try {
     summaryParsed = JSON.parse(result.stdout);
@@ -219,8 +219,8 @@ try {
 let staleParsed;
 let staleExtensionCliExitPreserved = false;
 let staleExtensionStructuredOutput = false;
-await withStaleHealthServer(async (bridgeUrl, staleExtensionVersion) => {
-  const result = await runCli(['runtime-smoke'], { CHROME_BRIDGE_URL: bridgeUrl });
+await withStaleHealthServer(async (socketPath, staleExtensionVersion) => {
+  const result = await runCli(['runtime-smoke'], { CHROME_BRIDGE_SOCKET: socketPath });
   staleExtensionCliExitPreserved = result.ok === false;
   try {
     staleParsed = JSON.parse(result.stdout);
@@ -272,8 +272,8 @@ await withStaleHealthServer(async (bridgeUrl, staleExtensionVersion) => {
 let staleBridgeParsed;
 let staleBridgeCliExitPreserved = false;
 let staleBridgeStructuredOutput = false;
-await withStaleBridgeHealthServer(async (bridgeUrl, staleBridgeVersion) => {
-  const result = await runCli(['runtime-smoke'], { CHROME_BRIDGE_URL: bridgeUrl });
+await withStaleBridgeHealthServer(async (socketPath, staleBridgeVersion) => {
+  const result = await runCli(['runtime-smoke'], { CHROME_BRIDGE_SOCKET: socketPath });
   staleBridgeCliExitPreserved = result.ok === false;
   try {
     staleBridgeParsed = JSON.parse(result.stdout);
@@ -294,7 +294,7 @@ await withStaleBridgeHealthServer(async (bridgeUrl, staleBridgeVersion) => {
     'stale-bridge top-level nextCommand must point at live doctor after restart',
   );
   check(
-    staleBridgeParsed.nextAction?.includes('Restart the local Chrome Bridge server'),
+    staleBridgeParsed.nextAction?.includes('Restart the Native Messaging Host'),
     'stale-bridge top-level nextAction must explain the bridge restart action',
   );
   check(
@@ -302,7 +302,7 @@ await withStaleBridgeHealthServer(async (bridgeUrl, staleBridgeVersion) => {
     'stale-bridge verification metadata must point at live doctor as the next command after restart',
   );
   check(
-    staleBridgeParsed.verification?.nextAction?.includes('Restart the local Chrome Bridge server'),
+    staleBridgeParsed.verification?.nextAction?.includes('Restart the Native Messaging Host'),
     'stale-bridge verification metadata must explain the next bridge restart action',
   );
   check(staleBridgeParsed.verification?.observed?.bridgeVersion === staleBridgeVersion, 'stale-bridge verification metadata must include observed bridge version');

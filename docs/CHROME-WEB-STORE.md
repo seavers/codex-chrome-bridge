@@ -14,7 +14,7 @@ Local MCP bridge that lets AI agents inspect and control your real Chrome profil
 
 Detailed description:
 
-Chrome MCP Bridge connects MCP-capable AI tools to your local Google Chrome profile through a Chrome extension, local loopback bridge server, CLI, and MCP server. It is designed for read-first workflows where an agent needs to inspect a logged-in dashboard, browser-authenticated page, report, or admin tool that is already available in your Chrome profile.
+Chrome MCP Bridge connects MCP-capable AI tools to your local Google Chrome profile through a Chrome extension, local loopback Native Messaging Host, CLI, and MCP server. It is designed for read-first workflows where an agent needs to inspect a logged-in dashboard, browser-authenticated page, report, or admin tool that is already available in your Chrome profile.
 
 The extension works with a local server bound to `127.0.0.1`. It does not send browser activity to a remote backend, does not include analytics, and does not provide CAPTCHA bypass or credential extraction. Sensitive browser reads and mutating actions are guarded by explicit confirmation flags in the CLI/MCP layer.
 

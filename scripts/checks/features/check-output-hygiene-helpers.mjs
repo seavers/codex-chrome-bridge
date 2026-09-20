@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -79,7 +79,7 @@ async function runCli(args, env) {
 async function withFakeBridge(fn) {
   const receivedCommands = [];
   const longUrl = `https://example.test/${'x'.repeat(1200)}`;
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({
@@ -206,9 +206,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
     });
   } finally {
@@ -252,9 +252,9 @@ async function checkArtifactHelpers(tmpDir) {
 }
 
 async function checkBridgeHelpers(tmpDir) {
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands }) => {
     const artifactDir = path.join(tmpDir, 'bridge-artifacts');
-    const env = inheritedEnv({ CHROME_BRIDGE_URL: bridgeUrl });
+    const env = inheritedEnv({ CHROME_BRIDGE_SOCKET: socketPath });
 
     const tabs = await runCli(['tabs', '--json', '--summary-only'], env);
     check(tabs.ok, `tabs --summary-only failed: ${tabs.stderr || tabs.stdout}`);

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import net from 'node:net';
+import { BRIDGE_VERSION } from '../shared/command-registry.mjs';
 import { DEFAULT_SOCKET_PATH } from '../shared/native-bridge.mjs';
 
 const socketPath = process.env.CHROME_BRIDGE_SOCKET || DEFAULT_SOCKET_PATH;
@@ -62,6 +63,7 @@ function handleSocketRequest(socket, request) {
   if (request?.type === 'health') {
     sendResponse(socket, {
       ok: true,
+      bridge: { version: BRIDGE_VERSION },
       transport: 'native-messaging+unix-socket',
       socketPath,
       extension: extensionConnected ? { connected: true, info: extensionInfo } : { connected: false },

@@ -87,7 +87,7 @@ const [
 ] = await Promise.all([
   fs.readFile(path.join(rootDir, 'extension/manifest.json'), 'utf8'),
   fs.readFile(path.join(rootDir, 'package.json'), 'utf8'),
-  fs.readFile(path.join(rootDir, 'server/bridge-server.mjs'), 'utf8'),
+  fs.readFile(path.join(rootDir, 'native/host.mjs'), 'utf8'),
   readCliSource(rootDir),
   readMcpSource(rootDir),
   fs.readFile(path.join(rootDir, 'extension/background.js'), 'utf8'),
@@ -653,36 +653,17 @@ check(
   commandCatalogMarkdown().includes('| doctor | diagnostic | read | 10000 ms | doctor | chrome_bridge_doctor | optional |'),
   'generated command catalog must expose optional live bridge metadata for doctor',
 );
-check(serverText.includes('commandDefaultTimeoutMs'), 'server must import/use commandDefaultTimeoutMs');
-check(serverText.includes('return commandDefaultTimeoutMs(action)'), 'server command timeout default must derive from registry action metadata');
-check(serverText.includes('commandTimeoutMs(action, timeoutMs)'), 'server /command path must pass action to timeout resolver');
-check(serverText.includes('VERSION_UNKNOWN'), 'server must fail closed when a connected extension has not reported its version');
-check(serverText.includes('extensionClients: new Map()'), 'server must keep per-profile extension clients instead of one global socket');
-check(serverText.includes("profileKey: `socket:${randomUUID()}`"), 'server websocket reconnect must start as an anonymous profile before hello');
-check(serverText.includes('function requireExtensionOrigin(req)'), 'server must centralize extension-origin ingress checks');
-check(serverText.includes('INVALID_EXTENSION_ORIGIN'), 'server extension ingress must return a stable invalid-origin error code');
-check(serverText.includes('function requireExtensionIdentity(req, info = {})'), 'server must verify extension origin/id parity when the extension reports an id');
-check(serverText.includes('EXTENSION_ID_MISMATCH'), 'server extension ingress must return a stable extension-id mismatch code');
-check(serverText.includes('function requireKnownExtensionOrigin(req, client)'), 'server long-poll fallback must verify known extension id on poll requests');
-check(serverText.includes('!isExtensionOrigin(req)'), 'server websocket ingress must require a chrome-extension origin');
-check(serverText.includes('function requireCommandOrigin(req)'), 'server must reject web origins on direct command ingress');
-check(serverText.includes('INVALID_COMMAND_ORIGIN'), 'server command ingress must return a stable invalid-origin error code');
-check(serverText.includes('Direct command ingress rejects browser and extension origins'), 'server direct command ingress must be originless-only for local CLI/MCP clients');
-check(serverText.includes('function isExtensionIngressPath(req)'), 'server CORS must be scoped to extension ingress paths');
-check(serverText.includes('isExtensionIngressPath(req) && origin.startsWith'), 'server CORS must not expose direct /command to extension origins');
-check(serverText.includes('function validateCommandEnvelope(body)'), 'server must validate the direct /command envelope before dispatch');
-check(serverText.includes("const COMMAND_BODY_KEYS = new Set(['action', 'payload', 'timeoutMs'])"), 'server command envelope keys must stay explicit');
-check(serverText.includes('function requireJsonContentType(req)'), 'server must require application/json for POST JSON endpoints');
-check(serverText.includes('UNSUPPORTED_MEDIA_TYPE'), 'server must return a stable media-type error code');
-check(serverText.includes('function drainRequestBody(req)'), 'server oversized request handling must drain remaining request bytes');
-check(serverText.includes('EXTENSION_NOT_CONNECTED'), 'server must return a stable code when the extension is disconnected');
+check(serverText.includes('BRIDGE_VERSION'), 'Native Host must report the bridge version');
+check(serverText.includes('startSocketServer'), 'Native Host must own the Unix Socket listener');
+check(serverText.includes("request?.type === 'command'"), 'Native Host must dispatch command requests to Native Messaging');
+check(serverText.includes('sendNativeMessage'), 'Native Host must relay commands through Native Messaging');
 check(cliText.includes('timeoutMs ?? commandDefaultTimeoutMs(action)'), 'CLI command wrapper must default to registry action timeout');
 check(cliText.includes('function normalizeHttpMethod(value)'), 'CLI must normalize and validate request --method');
 check(functionBlock(cliText, 'doctor').includes("Boolean(args['live-checks'])"), 'CLI doctor must keep live checks behind --live-checks');
 check(functionBlock(cliText, 'doctor').includes('Pass --live-checks'), 'CLI doctor offline mode must explain how to opt into live checks');
 check(functionBlock(cliText, 'doctor').includes('runtime-smoke --coverage-plan'), 'CLI doctor offline mode must recommend the offline runtime smoke coverage plan');
 check(functionBlock(cliText, 'doctor').includes('expectedBridgeVersion'), 'CLI doctor live checks must report expected bridge version');
-check(functionBlock(cliText, 'doctor').includes('bridgeCurrent'), 'CLI doctor live checks must report whether the bridge server version is current');
+check(functionBlock(cliText, 'doctor').includes('bridgeCurrent'), 'CLI doctor live checks must report whether the Native Messaging Host version is current');
 check(cliText.includes("if (cmd === 'mcp-config')"), 'CLI mcp-config command must be implemented');
 check(cliText.includes('function mcpConfigText'), 'CLI mcp-config must centralize MCP client snippet generation');
 check(cliText.includes('Claude Code') && cliText.includes('Cursor') && cliText.includes('Hermes Agent'), 'CLI mcp-config must cover major MCP clients');
@@ -989,10 +970,10 @@ check(mcpRuntimeSmokeBlock.includes('cliExitError'), 'MCP runtime smoke helper m
 check(mcpText.includes('verification.status="not-run"') && mcpText.includes('verification.status="passed"'), 'MCP runtime smoke tool description must document verification status semantics');
 check(mcpDocsText.includes('verification.status: "not-run"') && mcpDocsText.includes('verification.status: "passed"'), 'MCP docs must document runtime smoke verification status semantics');
 check(mcpText.includes('z.enum(HTTP_METHODS)'), 'MCP request method schema must use the shared HTTP method allowlist');
-check(functionBlock(cliText, 'summaryRecommendations').includes('health?.bridge?.version'), 'CLI session summary recommendations must inspect bridge server version');
-check(functionBlock(cliText, 'summaryRecommendations').includes('Restart the local Chrome Bridge server'), 'CLI session summary recommendations must suggest restarting a stale bridge server');
-check(functionBlock(mcpText, 'summaryRecommendations').includes('health?.bridge?.version'), 'MCP session summary recommendations must inspect bridge server version');
-check(functionBlock(mcpText, 'summaryRecommendations').includes('Restart the local Chrome Bridge server'), 'MCP session summary recommendations must suggest restarting a stale bridge server');
+check(functionBlock(cliText, 'summaryRecommendations').includes('health?.bridge?.version || health?.extension?.info?.version'), 'CLI session summary recommendations must inspect Native Messaging Host version');
+check(functionBlock(cliText, 'summaryRecommendations').includes('Restart the Native Messaging Host'), 'CLI session summary recommendations must suggest restarting a stale Native Messaging Host');
+check(functionBlock(mcpText, 'summaryRecommendations').includes('health?.bridge?.version || health?.extension?.info?.version'), 'MCP session summary recommendations must inspect Native Messaging Host version');
+check(functionBlock(mcpText, 'summaryRecommendations').includes('Restart the Native Messaging Host'), 'MCP session summary recommendations must suggest restarting a stale Native Messaging Host');
 check(cliText.includes('includeSnapshot') && cliText.includes('includeScreenshot'), 'CLI debug bundle page artifacts must be explicit opt-in');
 check(mcpText.includes('includeSnapshot: z.boolean().optional()') && mcpText.includes('includeScreenshot: z.boolean().optional()'), 'MCP debug bundle page artifacts must be explicit opt-in');
 check(cliText.includes('function redactDebugBundleValue(value)') && mcpText.includes('function redactDebugBundleValue(value)'), 'debug bundle JSON artifacts must pass through a redaction helper');
@@ -1063,7 +1044,7 @@ check(runtimeSmokeLiveVerificationBlock.includes('finalCommands') && runtimeSmok
 check(runtimeSmokeLiveVerificationBlock.includes('nextCommand') && runtimeSmokeLiveVerificationBlock.includes('nextAction'), 'runtime-smoke live verification metadata must include contextual next recovery step');
 check(runtimeSmokeLiveVerificationBlock.includes('bridgeVersion'), 'runtime-smoke live verification metadata must include bridge version');
 check(runtimeSmokeBlock.includes("runtimeSmokeLiveVerification({ status: 'skipped'"), 'runtime-smoke stale-extension output must include explicit skipped verification state');
-check(runtimeSmokeBlock.includes('Restart the local Chrome Bridge server first'), 'runtime-smoke must skip before fixture work when live bridge server version is stale');
+check(runtimeSmokeBlock.includes('Restart the Native Messaging Host first'), 'runtime-smoke must skip before fixture work when live Native Messaging Host version is stale');
 check(runtimeSmokeBlock.includes('const verification = runtimeSmokeLiveVerification({') && runtimeSmokeBlock.includes('verification,'), 'runtime-smoke final output must include machine-readable live verification metadata');
 check(runtimeSmokeBlock.includes('nextCommand: verification.nextCommand') && runtimeSmokeBlock.includes('nextAction: verification.nextAction'), 'runtime-smoke outputs must mirror recovery hints at the top level');
 check(runtimeSmokeBlock.includes('let fatalError = null') && runtimeSmokeBlock.includes("name: 'runtime smoke fatal error'"), 'runtime-smoke must convert required-step exceptions into structured failed JSON');

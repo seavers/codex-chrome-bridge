@@ -22,12 +22,12 @@ Execution notes:
 
 Project purpose:
 
-Chrome MCP Bridge is a local-first bridge between AI agents and the user's real logged-in Chrome profile. It combines a Chrome Manifest V3 extension, a local loopback bridge server, a CLI, and a stdio MCP server. The product intentionally optimizes for read-mostly, scoped, human-owned browser workflows rather than cloud browser farms, stealth scraping, CAPTCHA bypass, or unattended account mutation.
+Chrome MCP Bridge is a local-first bridge between AI agents and the user's real logged-in Chrome profile. It combines a Chrome Manifest V3 extension, a local loopback Native Messaging Host, a CLI, and a stdio MCP server. The product intentionally optimizes for read-mostly, scoped, human-owned browser workflows rather than cloud browser farms, stealth scraping, CAPTCHA bypass, or unattended account mutation.
 
 Primary runtime surfaces:
 
 - `extension/`: the only layer that talks directly to Chrome extension APIs, page scripts, debugger/CDP, browser data, downloads, screenshots, PDF export, prompts, tab groups, and workspace policy.
-- `server/bridge-server.mjs`: local HTTP/WebSocket command broker on loopback. It validates direct command ingress, payload envelopes, timeout bounds, extension origin/id parity, stale extension versions, and bridge shutdown lifecycle.
+- `native/host.mjs`: local Native Messaging Unix Socket command broker on loopback. It validates direct command ingress, payload envelopes, timeout bounds, extension origin/id parity, stale extension versions, and bridge shutdown lifecycle.
 - `bin/chrome-bridge.mjs`: stable CLI binary wrapper. Runtime implementation currently lives in `bin/cli/main.mjs`.
 - `mcp/chrome-bridge-mcp.mjs`: stable MCP binary wrapper. Runtime implementation currently lives in `mcp/server/main.mjs`.
 - `shared/registry/`: source of truth for extension actions, CLI commands, MCP tools, command metadata, docs generation metadata, risk tiers, default timeouts, and payload validation.
@@ -36,8 +36,8 @@ Key data flow:
 
 ```text
 CLI or MCP client
-  -> local loopback bridge server
-  -> Chrome extension WebSocket/offscreen document
+  -> local loopback Native Messaging Host
+  -> Chrome extension Native Messaging/offscreen document
   -> Chrome extension APIs, injected page helpers, or Chrome Debugger/CDP
   -> result returns through the same path
 ```
@@ -103,7 +103,7 @@ Evidence gathered:
   - `scripts/checks/contracts/check-command-registry.mjs`: about 1,396 lines.
   - `scripts/checks/cli/check-cli-local-tools.mjs`: about 1,140 lines.
   - `scripts/checks/mcp/check-mcp-local-tools.mjs`: about 787 lines.
-  - `server/bridge-server.mjs`: about 745 lines.
+  - `native/host.mjs`: about 745 lines.
 - Source-pattern scan across runtime and scripts found heavy string-search coupling:
   - `includes(` appears more than 1,500 times.
   - `JSON.parse` appears more than 100 times.
@@ -171,7 +171,7 @@ This is a good idea, and it is more useful than a generic browser automation wra
 The architecture is basically right:
 
 - The extension owns Chrome APIs.
-- The bridge server owns loopback transport and ingress validation.
+- The Native Messaging Host owns loopback transport and ingress validation.
 - CLI and MCP are clients over the same command surface.
 - The shared registry keeps command metadata, docs, CLI, MCP, and validation from drifting.
 
@@ -410,7 +410,7 @@ Ten best ideas:
 
 9. First-run installer diagnostics.
 
-   Add a focused setup diagnostic that checks Node version, package install, bridge server, extension path, unpacked extension status, MCP config files, and recommended profile for the detected client.
+   Add a focused setup diagnostic that checks Node version, package install, Native Messaging Host, extension path, unpacked extension status, MCP config files, and recommended profile for the detected client.
 
 10. Client compatibility fixtures.
 
@@ -717,7 +717,7 @@ Skill: `/jef_deployment_verifier`
 
 Plan:
 
-- Interpret deployment for this project as the local bridge server plus unpacked Chrome extension plus real Chrome runtime smoke.
+- Interpret deployment for this project as the Native Messaging Host plus unpacked Chrome extension plus real Chrome runtime smoke.
 - Reload the extension.
 - Run live doctor.
 - Run live runtime smoke summary with an artifact path.
@@ -734,7 +734,7 @@ Result:
 - Live doctor passed.
 - Bridge version: `0.4.1`.
 - Extension version: `0.4.1`.
-- Extension transport: WebSocket.
+- Extension transport: Native Messaging.
 - Runtime smoke passed.
 - Runtime smoke steps: 59.
 - Runtime smoke failures: 0.

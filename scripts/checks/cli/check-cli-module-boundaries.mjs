@@ -48,7 +48,7 @@ check(wrapperText.includes('main().catch'), 'bin/chrome-bridge.mjs must keep top
 check((wrapperText.match(/\n/g) || []).length <= 12, 'bin/chrome-bridge.mjs wrapper must stay tiny');
 check(!wrapperText.includes("cmd === '"), 'bin/chrome-bridge.mjs wrapper must not contain command dispatch internals');
 check(mainText.includes('export async function main()'), 'bin/cli/main.mjs must export the CLI main function');
-check(mainText.includes('function parseArgs') && mainText.includes("cmd === 'server'"), 'bin/cli/main.mjs must own CLI parsing and command dispatch');
+check(mainText.includes('function parseArgs') && mainText.includes("cmd === 'health'"), 'bin/cli/main.mjs must own CLI parsing and command dispatch');
 check(cliSourceHelperText.includes('readCliSource') && cliSourceHelperText.includes('bin/cli/main.mjs'), 'CLI source helper must aggregate wrapper and implementation files');
 
 if (failures.length) {

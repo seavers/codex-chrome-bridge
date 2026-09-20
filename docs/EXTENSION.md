@@ -74,6 +74,6 @@ The extension currently requests:
 - `tabs`
 - `<all_urls>` host permissions
 
-These permissions are broad because the tool works with real Chrome tabs. Use this only with a local bridge server you control.
+These permissions are broad because the tool works with real Chrome tabs. Use this only with the local Native Messaging Host installed for your Chrome profile.
 
 See [PRIVACY-POLICY.md](PRIVACY-POLICY.md) for the plain-language privacy statement intended for distribution pages and store submission forms.

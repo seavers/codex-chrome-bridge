@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -158,7 +158,7 @@ async function runCli(args, env = {}) {
 async function withFakeObserveBridge(fn) {
   const observed = fixtureObserveResult();
   let observeCalls = 0;
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url === '/command') {
       let body = '';
       req.setEncoding('utf8');
@@ -193,9 +193,9 @@ async function withFakeObserveBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       observed,
       getObserveCalls: () => observeCalls,
     });
@@ -250,9 +250,9 @@ const readOnlyRiskPlan = buildActPreviewPlan({
 });
 check(!readOnlyRiskPlan.candidates.some((candidate) => candidate.selector === '#delete'), 'read-only act-preview must filter likely mutation actions');
 
-await withFakeObserveBridge(async ({ bridgeUrl, getObserveCalls }) => {
+await withFakeObserveBridge(async ({ socketPath, getObserveCalls }) => {
   const cliLoginResult = await runCli(['act-preview', '--intent', 'click login'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
   check(cliLoginResult.ok, 'CLI act-preview must succeed against fake observe bridge');
   const cliLoginJson = parseJson(cliLoginResult.stdout, 'CLI act-preview login');
@@ -260,14 +260,14 @@ await withFakeObserveBridge(async ({ bridgeUrl, getObserveCalls }) => {
   check(getObserveCalls() === 1, 'CLI act-preview must only issue one observe call');
 
   const cliPricingResult = await runCli(['act-preview', '--intent', 'open pricing'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
   check(cliPricingResult.ok, 'CLI act-preview must succeed for pricing intent');
   const cliPricingJson = parseJson(cliPricingResult.stdout, 'CLI act-preview pricing');
   check(cliPricingJson?.recommended?.selector === '#pricing', 'CLI act-preview must recommend pricing for pricing intent');
 
   const cliSearchResult = await runCli(['act-preview', '--intent', 'search for "wireless mouse"'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
   check(cliSearchResult.ok, 'CLI act-preview must succeed for search intent');
   const cliSearchJson = parseJson(cliSearchResult.stdout, 'CLI act-preview search');
@@ -275,13 +275,13 @@ await withFakeObserveBridge(async ({ bridgeUrl, getObserveCalls }) => {
   check(cliSearchJson?.recommended?.exactCommand?.includes('"wireless mouse"'), 'CLI act-preview search recommendation must include the search text');
 
   const cliDownloadResult = await runCli(['act-preview', '--intent', 'download report'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
   check(cliDownloadResult.ok, 'CLI act-preview must succeed for download intent');
   const cliDownloadJson = parseJson(cliDownloadResult.stdout, 'CLI act-preview download');
   check(cliDownloadJson?.recommended?.selector === '#download', 'CLI act-preview must recommend the download control');
 
-  const mcpParsed = await withMcpClient({ CHROME_BRIDGE_URL: bridgeUrl }, async (client) => {
+  const mcpParsed = await withMcpClient({ CHROME_BRIDGE_SOCKET: socketPath }, async (client) => {
     const result = await client.callTool({
       name: 'chrome_bridge_act_preview',
       arguments: {

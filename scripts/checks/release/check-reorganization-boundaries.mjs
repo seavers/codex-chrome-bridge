@@ -28,7 +28,7 @@ const planText = await read('PROPOSED_CODE_FILE_REORGANIZATION_PLAN.md');
 const stableEntrypoints = [
   'bin/chrome-bridge.mjs',
   'mcp/chrome-bridge-mcp.mjs',
-  'server/bridge-server.mjs',
+  'native/host.mjs',
   'extension/manifest.json',
   'extension/background.js',
   'extension/ask.html',

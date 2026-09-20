@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { execFile } from 'node:child_process';
-import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -110,7 +110,7 @@ async function withMcpClient(env, fn) {
 
 async function withFakeBridge(fn) {
   const receivedCommands = [];
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({
@@ -145,9 +145,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
     });
   } finally {
@@ -228,8 +228,8 @@ const { setViewport, emulateNetwork, clearEmulation } = await importEmulationAct
   check(fixture.commands.some((entry) => entry.method === 'Network.emulateNetworkConditions' && entry.params.downloadThroughput === -1 && entry.params.uploadThroughput === -1), 'clearEmulation must clear network throttling');
 }
 
-await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
-  const env = { CHROME_BRIDGE_URL: bridgeUrl };
+await withFakeBridge(async ({ socketPath, receivedCommands }) => {
+  const env = { CHROME_BRIDGE_SOCKET: socketPath };
 
   const missingConfirm = await runCli(['set-viewport', '--width', '1280', '--height', '720'], env);
   check(!missingConfirm.ok, 'CLI set-viewport must require --confirm');

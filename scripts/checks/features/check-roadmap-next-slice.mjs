@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -157,7 +157,7 @@ const sampleLighthouseReport = {
 
 async function withFakeBridge(fn) {
   const receivedCommands = [];
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -230,9 +230,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
     });
   } finally {
@@ -330,7 +330,7 @@ async function checkInvalidLighthouseJson(tmpDir) {
 }
 
 async function checkCliStructuredPreset(tmpDir) {
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands }) => {
     const out = path.join(tmpDir, 'article.json');
     const rawDir = path.join(tmpDir, 'raw-article');
     const result = await runCli([
@@ -343,7 +343,7 @@ async function checkCliStructuredPreset(tmpDir) {
       out,
       '--artifact-dir',
       rawDir,
-    ], inheritedEnv({ CHROME_BRIDGE_URL: bridgeUrl }));
+    ], inheritedEnv({ CHROME_BRIDGE_SOCKET: socketPath }));
 
     check(result.ok, `article CLI preset failed: ${result.stderr || result.stdout}`);
     check(result.parsed?.ok === true, 'article CLI preset summary must report ok=true');
@@ -366,7 +366,7 @@ async function checkCliStructuredPreset(tmpDir) {
 }
 
 async function checkCliDownloadDiscovery(tmpDir) {
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands }) => {
     const out = path.join(tmpDir, 'downloads.json');
     const rawDir = path.join(tmpDir, 'raw-downloads');
     const result = await runCli([
@@ -377,7 +377,7 @@ async function checkCliDownloadDiscovery(tmpDir) {
       out,
       '--artifact-dir',
       rawDir,
-    ], inheritedEnv({ CHROME_BRIDGE_URL: bridgeUrl }));
+    ], inheritedEnv({ CHROME_BRIDGE_SOCKET: socketPath }));
 
     check(result.ok, `download-discovery CLI failed: ${result.stderr || result.stdout}`);
     check(result.parsed?.ok === true, 'download-discovery summary must report ok=true');

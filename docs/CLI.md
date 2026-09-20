@@ -19,7 +19,6 @@ The command metadata table below is generated from the shared registry by `npm r
 <!-- BEGIN GENERATED CLI REFERENCE -->
 | Command | Contract | Risk | Default Timeout | Confirm | Live Bridge | Summary |
 | --- | --- | --- | --- | --- | --- | --- |
-| `server` | `server` | system | - | no | no | Start the local Chrome Bridge HTTP/WebSocket server. |
 | `health` | `health` | read | 10000 ms | no | yes | Read local bridge health and extension connection status. |
 | `status` | `status` | read | 30000 ms | no | yes | Print cheap-first bridge status and token-budget recommendations. |
 | `windows` | `windows` | read | 10000 ms | conditional | yes | List all Chrome windows by default; pass includeAll=false with an explicit group to limit the result. |
@@ -117,9 +116,8 @@ The safety notes below are generated from the shared registry by `npm run docs:c
 
 The command blocks below are generated from the shared registry by `npm run docs:commands`.
 
-<!-- BEGIN GENERATED CLI USAGE: server-diagnostics -->
+<!-- BEGIN GENERATED CLI USAGE: diagnostics -->
 ```bash
-chrome-bridge server [--port 17376]
 chrome-bridge health
 chrome-bridge status [--token-budget]
 chrome-bridge windows [--all --confirm] [--group-title <title>] [--group-color <color>]
@@ -138,7 +136,7 @@ chrome-bridge reload-extension --confirm
 chrome-bridge self-test
 chrome-bridge runtime-smoke [--keep-tab] [--coverage-plan] [--summary-only] [--out <file>]
 ```
-<!-- END GENERATED CLI USAGE: server-diagnostics -->
+<!-- END GENERATED CLI USAGE: diagnostics -->
 
 ## Tabs and Navigation
 
@@ -173,7 +171,7 @@ If the extension is enabled in multiple Chrome profiles, `chrome-bridge health` 
 
 `tabs --all` and `windows --all` require `--confirm` because they can expose unrelated tab URLs and titles outside the scoped workspace group.
 
-`doctor` is offline by default and reports local paths plus setup hints without contacting the bridge or Chrome. It also reports recommended MCP profiles per client and offline next actions such as `runtime-smoke --coverage-plan`, `advise --task "<goal>"`, `mcp-config --client ...`, and the new project-local installer path `mcp-write --client ...`. Use `--live-checks` only when no other session is using the bridge; it probes `/health`, verifies the live bridge server version, checks the extension version, and checks Chrome Apple Events settings. `--copy-path` writes the extension path to the clipboard, and `--open-extensions` opens Chrome's extensions page.
+`doctor` is offline by default and reports local paths plus setup hints without contacting the bridge or Chrome. It also reports recommended MCP profiles per client and offline next actions such as `runtime-smoke --coverage-plan`, `advise --task "<goal>"`, `mcp-config --client ...`, and the new project-local installer path `mcp-write --client ...`. Use `--live-checks` only when no other session is using the bridge; it probes `/health`, verifies the live Native Messaging Host version, checks the extension version, and checks Chrome Apple Events settings. `--copy-path` writes the extension path to the clipboard, and `--open-extensions` opens Chrome's extensions page.
 
 `mcp-write` writes or merges project-local MCP config files for Claude Code, Cursor, Codex, and VS Code without touching user-global config by default. Use `--root <dir>` to target another workspace, `--out <file>` to render an explicit file for Windsurf, Hermes, or generic hosts, and `--force` only when you intentionally want to overwrite a non-mergeable existing file.
 
@@ -320,6 +318,6 @@ The command opens a local extension page inside the active scoped group and wait
 chrome-bridge ask --question "Continue?" --choices-json '["Yes","No"]' --no-text
 ```
 
-`session-summary` includes bridge health, scoped group state, workspace policy state, concrete `nextActions`, and recommendations such as bridge server restart, extension reload, first-tab setup, or active `strict` policy warnings. `debug-bundle` writes the same summary into `session-summary.json`.
+`session-summary` includes bridge health, scoped group state, workspace policy state, concrete `nextActions`, and recommendations such as Native Messaging Host restart, extension reload, first-tab setup, or active `strict` policy warnings. `debug-bundle` writes the same summary into `session-summary.json`.
 
 `debug-bundle` redacts URL/title/text/value fields in its default JSON files and writes `trace-summary.json` rather than full trace events. Use `--include-snapshot`, `--include-observe`, `--include-screenshot`, or `--include-trace-events` only when the resulting local bundle may safely contain page text, element labels, pixels, URLs, or console/log text from the active browser page.

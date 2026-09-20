@@ -368,15 +368,6 @@ export const COMMAND_METADATA = Object.freeze(Object.fromEntries(
 export const COMMAND_CATALOG = Object.freeze(EXTENSION_ACTIONS.map((action) => COMMAND_METADATA[action]));
 
 const LOCAL_COMMAND_DOCS = Object.freeze({
-  server: {
-    category: 'service',
-    riskTier: 'system',
-    defaultTimeoutMs: null,
-    summary: 'Start the local Chrome Bridge HTTP/WebSocket server.',
-    cli: ['server'],
-    mcp: [],
-    usesLiveBridge: false,
-  },
   health: {
     category: 'diagnostic',
     riskTier: 'read',

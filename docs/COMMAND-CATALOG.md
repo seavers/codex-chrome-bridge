@@ -61,7 +61,6 @@ Version: 0.4.1
 
 | ID | Category | Risk | Default Timeout | CLI | MCP | Live Bridge | Summary |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| server | service | system | - | server | - | no | Start the local Chrome Bridge HTTP/WebSocket server. |
 | health | diagnostic | read | 10000 ms | health | chrome_bridge_health | yes | Read local bridge health and extension connection status. |
 | status | diagnostic | read | 30000 ms | status | - | yes | Print cheap-first bridge status and token-budget recommendations. |
 | session-summary | diagnostic | read | 30000 ms | session-summary | chrome_bridge_session_summary | yes | Summarize bridge health, workspace policy, scoped group state, and recommendations. |
@@ -94,7 +93,6 @@ Version: 0.4.1
 ## CLI Usage Signatures
 
 ```text
-chrome-bridge server [--port 17376]
 chrome-bridge health
 chrome-bridge windows [--all --confirm] [--group-title <title>] [--group-color <color>]
 chrome-bridge group [--tabs] [--group-title <title>] [--group-color <color>]

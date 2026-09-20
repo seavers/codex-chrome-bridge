@@ -33,7 +33,7 @@ async function checkSourceSurface() {
     cliText,
     mcpText,
     browserDataText,
-    bridgeServerText,
+    nativeHostText,
     runTabsText,
     askText,
   ] = await Promise.all([
@@ -42,7 +42,7 @@ async function checkSourceSurface() {
     readCliSource(rootDir),
     readMcpSource(rootDir),
     readProjectFile('extension/browser-data.js'),
-    readProjectFile('server/bridge-server.mjs'),
+    readProjectFile('native/host.mjs'),
     readProjectFile('shared/run-tabs.mjs'),
     readProjectFile('extension/ask.js'),
   ]);
@@ -67,15 +67,15 @@ async function checkSourceSurface() {
   }
   check(acceptsRequestTimeoutMs, 'validateCommandPayload must accept bounded fetchUrl requestTimeoutMs');
 
-  check(cliText.includes('bridgeFetchTimeoutSignal'), 'CLI bridgeFetch must use an AbortSignal timeout helper');
+  check(cliText.includes('nativeBridgeCommand'), 'CLI bridge commands must use Native Messaging');
   check(cliText.includes('requestTimeoutMs: parseNumberRangeArg(args'), 'CLI request command must forward requestTimeoutMs');
-  check(mcpText.includes('bridgeFetchTimeoutSignal'), 'MCP bridgeFetch must use an AbortSignal timeout helper');
+  check(mcpText.includes('nativeBridgeCommand'), 'MCP bridge commands must use Native Messaging');
   check(mcpText.includes('requestTimeoutMs: z.number().min(1000).max(60000).optional()'), 'MCP request tool must expose bounded requestTimeoutMs');
   check(browserDataText.includes('AbortController') && browserDataText.includes('signal:'), 'extension fetchUrl must pass an AbortSignal to fetch');
   check(browserDataText.includes('FETCH_URL_TIMEOUT'), 'extension fetchUrl aborts must expose stable FETCH_URL_TIMEOUT code');
 
-  check(bridgeServerText.includes("from '../shared/safe-record.mjs'"), 'bridge server must import safe metadata helper');
-  check(bridgeServerText.includes('stripUnsafeObjectKeys(info'), 'bridge server must sanitize extension metadata before merging');
+  check(nativeHostText.includes('startSocketServer'), 'Native Messaging Host must own the Unix Socket listener');
+  check(nativeHostText.includes('sendNativeMessage'), 'Native Messaging Host must relay commands through Native Messaging');
   check(runTabsText.includes("from './safe-record.mjs'"), 'run-tabs must import safe record helper');
   check(runTabsText.includes('stripUnsafeObjectKeys(meta'), 'run-tabs must sanitize persisted tab metadata');
   check(runTabsText.includes('.corrupt.') && runTabsText.includes('parseError'), 'run-tabs must quarantine malformed JSON state files');

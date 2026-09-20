@@ -196,7 +196,7 @@ It opens a local extension page in the active scoped group and returns the user'
 
 MCP commands can target all Chrome tabs by default. Group-oriented commands may derive a per-session group title from `CHROME_BRIDGE_SESSION_TITLE`, `CODEX_SESSION_TITLE`, `CODEX_THREAD_TITLE`, or `CODEX_THREAD_ID`; explicit `groupTitle` arguments always override that title.
 
-`chrome_bridge_session_summary` includes bridge health, scoped group state, workspace policy state, the active MCP profile summary, concrete `nextActions`, and recommendations such as bridge server restart, extension reload, first-tab setup, or active `strict` policy warnings. `chrome_bridge_debug_bundle` writes the same policy-aware summary into `session-summary.json`.
+`chrome_bridge_session_summary` includes bridge health, scoped group state, workspace policy state, the active MCP profile summary, concrete `nextActions`, and recommendations such as Native Messaging Host restart, extension reload, first-tab setup, or active `strict` policy warnings. `chrome_bridge_debug_bundle` writes the same policy-aware summary into `session-summary.json`.
 
 `chrome_bridge_debug_bundle` redacts URL/title/text/value fields in its default JSON files and writes `trace-summary.json` rather than full trace events. Set `includeSnapshot`, `includeObserve`, `includeScreenshot`, or `includeTraceEvents` only when the local bundle may safely contain page text, element labels, pixels, URLs, or console/log text from the active browser page.
 

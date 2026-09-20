@@ -78,7 +78,7 @@ async function runCoveragePlan() {
       cwd: rootDir,
       env: {
         ...process.env,
-        CHROME_BRIDGE_URL: 'http://127.0.0.1:9',
+        CHROME_BRIDGE_SOCKET: '/tmp/chrome-bridge-unavailable.sock',
       },
       timeout: 10_000,
       maxBuffer: 1024 * 1024,
@@ -124,7 +124,7 @@ const [
   publishingText,
 ] = await Promise.all([
   readProjectFile('package.json'),
-  readProjectFile('server/bridge-server.mjs'),
+  readProjectFile('native/host.mjs'),
   readCliSource(rootDir),
   readMcpSource(rootDir),
   readProjectFile('extension/background.js'),
@@ -157,18 +157,14 @@ const [
 ]);
 const packageJson = JSON.parse(packageText);
 
-// Phase 0: safety and contract hardening.
-check(serverText.includes('ALLOWED_COMMAND_ACTIONS = new Set(EXTENSION_ACTIONS)'), 'Phase 0 must derive server action allowlist from registry');
-check(serverText.includes('UNSUPPORTED_ACTION'), 'Phase 0 must reject unsupported bridge actions');
-check(serverText.includes('VERSION_UNKNOWN') && serverText.includes('VERSION_MISMATCH'), 'Phase 0 must fail closed on missing or mismatched extension versions');
-check(serverText.includes('validateCommandEnvelope(body)') && serverText.includes('validateCommandPayload(action, extensionPayload)'), 'Phase 0 must validate direct command envelopes and payloads');
-check(serverText.includes('CHROME_BRIDGE_ENABLE_LONG_POLL') && serverText.includes('TRANSPORT_DISABLED'), 'Phase 0 must keep long-poll extension ingress disabled by default');
-check(serverText.includes('LOOPBACK_HOSTS') && serverText.includes('CHROME_BRIDGE_UNSAFE_HOST'), 'Phase 0 must preserve loopback-only binding by default');
-check(serverText.includes('body.code') && serverText.includes('body.details'), 'Phase 0 must preserve extension error codes/details');
-check(bridgeContractText.includes('rejects unsupported actions'), 'Phase 0 must have bridge contract coverage for unsupported actions');
-check(bridgeContractText.includes('malformed JSON') && bridgeContractText.includes('oversized'), 'Phase 0 must have bridge contract coverage for malformed and oversized bodies');
-check(bridgeContractText.includes('stale extension') && bridgeContractText.includes('VERSION_UNKNOWN'), 'Phase 0 must have bridge contract coverage for version fail-closed behavior');
-check(bridgeContractText.includes('allows confirmed extension reload on stale extension versions'), 'Phase 0 must have bridge contract coverage for stale-extension reload recovery');
+// Phase 0: Native Messaging and Unix Socket contract hardening.
+check(serverText.includes('BRIDGE_VERSION'), 'Phase 0 must report the Native Host version');
+check(serverText.includes('startSocketServer'), 'Phase 0 must own the Unix Socket listener');
+check(serverText.includes('sendNativeMessage'), 'Phase 0 must relay commands through Native Messaging');
+check(serverText.includes("request?.type === 'command'"), 'Phase 0 must dispatch command envelopes');
+check(serverText.includes('EXTENSION_NOT_CONNECTED'), 'Phase 0 must fail closed when the extension is disconnected');
+check(bridgeContractText.includes('native-messaging+unix-socket'), 'Phase 0 must have Native Messaging contract coverage');
+check(bridgeContractText.includes('EXTENSION_COMMAND_FAILED'), 'Phase 0 must preserve extension error codes');
 check(!backgroundText.includes('Network.getResponseBody') && !debuggerSessionText.includes('Network.getResponseBody'), 'Phase 0 trace implementation must not capture response bodies');
 rejectsPayload('open', { url: 'javascript:alert(1)' }, 'URL protocol', 'Phase 0 open URL validation');
 rejectsPayload('fetchUrl', { url: 'file:///etc/passwd', confirmed: true }, 'URL protocol', 'Phase 0 request URL validation');
@@ -236,7 +232,7 @@ check(roadmapText.includes('session-scoped bridge-created group IDs') && roadmap
 // Offline/live verification boundary.
 localCommand('runtime-smoke', { cli: 'runtime-smoke', mcp: 'chrome_bridge_runtime_smoke', liveBridge: 'yes' });
 localCommand('doctor', { cli: 'doctor', mcp: 'chrome_bridge_doctor', liveBridge: 'optional' });
-check(runtimeSmokePlanCheckerText.includes('CHROME_BRIDGE_URL') && runtimeSmokePlanCheckerText.includes('http://127.0.0.1:9'), 'Deferred verification must have an offline smoke-plan checker');
+check(runtimeSmokePlanCheckerText.includes('CHROME_BRIDGE_SOCKET') && runtimeSmokePlanCheckerText.includes('/tmp/chrome-bridge-unavailable.sock'), 'Deferred verification must have an offline smoke-plan checker');
 check(cliLocalToolsCheckerText.includes("runCli(['doctor'])") && cliLocalToolsCheckerText.includes('catalogJson.counts?.mcpTools'), 'Deferred verification must cover local CLI diagnostics offline');
 check(mcpRuntimeSmokeCheckerText.includes('chrome_bridge_runtime_smoke') && mcpRuntimeSmokeCheckerText.includes('cliExitError'), 'Deferred verification must cover MCP runtime-smoke JSON preservation');
 check(mcpLocalToolsCheckerText.includes('chrome_bridge_command_catalog') && mcpLocalToolsCheckerText.includes('unexpected MCP tool'), 'Deferred verification must cover MCP local tools and listTools parity');

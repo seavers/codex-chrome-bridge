@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +53,7 @@ async function withMcpClient(fn, env = {}) {
     command: process.execPath,
     args: [mcpPath],
     cwd: rootDir,
-    env: inheritedEnv({ CHROME_BRIDGE_URL: 'http://127.0.0.1:9', ...env }),
+    env: inheritedEnv({ CHROME_BRIDGE_SOCKET: '/tmp/chrome-bridge-unavailable.sock', ...env }),
     stderr: 'pipe',
   });
   const client = new Client({ name: 'chrome-bridge-mcp-local-tools-check', version: '0.1.0' });
@@ -82,7 +82,7 @@ async function withFakeLiveDoctor(fn) {
   await fs.writeFile(fakeOsascript, '#!/bin/sh\nprintf "Codex Bridge Fake Chrome Title\\n"\n');
   await fs.chmod(fakeOsascript, 0o755);
 
-  const server = http.createServer((req, res) => {
+  const server = createFakeNativeBridge((req, res) => {
     if (req.url !== '/health') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -110,9 +110,9 @@ async function withFakeLiveDoctor(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       pathEnv: `${fakeBinDir}${path.delimiter}${process.env.PATH || ''}`,
     });
   } finally {
@@ -123,7 +123,7 @@ async function withFakeLiveDoctor(fn) {
 
 async function withFakeStaleSummaryBridge(fn) {
   const staleBridgeVersion = '0.0.0-stale-summary';
-  const server = http.createServer((req, res) => {
+  const server = createFakeNativeBridge((req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({
@@ -161,9 +161,9 @@ async function withFakeStaleSummaryBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       staleBridgeVersion,
     });
   } finally {
@@ -173,7 +173,7 @@ async function withFakeStaleSummaryBridge(fn) {
 
 async function withFakeCommandBridge(fn) {
   const receivedCommands = [];
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -225,9 +225,9 @@ async function withFakeCommandBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
     });
   } finally {
@@ -354,7 +354,7 @@ await withMcpClient(async (client) => {
   CHROME_BRIDGE_MCP_TOOL_PROFILE: 'core',
 });
 
-await withFakeLiveDoctor(async ({ bridgeUrl, pathEnv }) => {
+await withFakeLiveDoctor(async ({ socketPath, pathEnv }) => {
   await withMcpClient(async (client) => {
     const liveDoctorParsed = parseToolJson(await client.callTool({
       name: 'chrome_bridge_doctor',
@@ -369,13 +369,13 @@ await withFakeLiveDoctor(async ({ bridgeUrl, pathEnv }) => {
     check(liveDoctorParsed.checks?.bridgeCurrent === true, 'MCP doctor live checks must confirm bridge version is current');
     doctorLiveBridgeCurrent = liveDoctorParsed.checks?.bridgeCurrent;
   }, {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     PATH: pathEnv,
   });
 });
 
 let sessionSummaryStaleBridgeRecommendation = false;
-await withFakeStaleSummaryBridge(async ({ bridgeUrl, staleBridgeVersion }) => {
+await withFakeStaleSummaryBridge(async ({ socketPath, staleBridgeVersion }) => {
   await withMcpClient(async (client) => {
     const summaryParsed = parseToolJson(await client.callTool({
       name: 'chrome_bridge_session_summary',
@@ -384,14 +384,14 @@ await withFakeStaleSummaryBridge(async ({ bridgeUrl, staleBridgeVersion }) => {
     if (!summaryParsed) return;
 
     sessionSummaryStaleBridgeRecommendation = summaryParsed.recommendations?.some((recommendation) => (
-      recommendation.includes('Restart the local Chrome Bridge server')
+      recommendation.includes('Restart the Native Messaging Host')
         && recommendation.includes(staleBridgeVersion)
     ));
-    check(sessionSummaryStaleBridgeRecommendation, 'MCP session-summary must recommend restarting stale bridge server');
+    check(sessionSummaryStaleBridgeRecommendation, 'MCP session-summary must recommend restarting stale Native Messaging Host');
     check(summaryParsed.mcpProfile?.profile === 'full', 'MCP session-summary must include the active MCP profile summary');
     check(summaryParsed.nextActions?.some((action) => action.includes('chrome_bridge_doctor')), 'MCP session-summary must include a concrete stale-bridge next action');
   }, {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
 });
 
@@ -404,7 +404,7 @@ let historyTimeChecks = 0;
 let groupScopePayloadChecks = 0;
 let mcpArtifactDirChecks = 0;
 let profileRoutingChecks = 0;
-await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
+await withFakeCommandBridge(async ({ socketPath, receivedCommands }) => {
   const groupTitle = 'Codex Bridge MCP Group Scope';
   const groupColor = 'cyan';
   await withMcpClient(async (client) => {
@@ -418,7 +418,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
     check(profileRoutePayload?.profileId === 'profile-mcp-check', 'MCP must forward CHROME_BRIDGE_PROFILE_ID as payload.profileId');
     profileRoutingChecks += 1;
   }, {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_PROFILE_ID: 'profile-mcp-check',
   });
 
@@ -717,7 +717,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
       groupScopePayloadChecks += 1;
     }
   }, {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
 
   await withMcpClient(async (client) => {
@@ -753,7 +753,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
     check(sessionOverridePayload?.groupTitle === groupTitle, 'MCP explicit groupTitle must override session-derived group title');
     groupScopePayloadChecks += 1;
   }, {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_SESSION_TITLE: 'Kurerok Research',
   });
 
@@ -768,7 +768,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
     check(threadDefaultPayload?.groupTitle === 'Codex Bridge - 019ea301', 'MCP must derive fallback groupTitle from short CODEX_THREAD_ID');
     groupScopePayloadChecks += 1;
   }, {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_SESSION_TITLE: '',
     CODEX_SESSION_TITLE: '',
     CODEX_THREAD_TITLE: '',

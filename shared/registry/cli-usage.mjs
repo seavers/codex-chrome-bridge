@@ -1,5 +1,4 @@
 export const CLI_USAGE_LINES = Object.freeze([
-  'chrome-bridge server [--port 17376]',
   'chrome-bridge health',
   'chrome-bridge windows [--all --confirm] [--group-title <title>] [--group-color <color>]',
   'chrome-bridge group [--tabs] [--group-title <title>] [--group-color <color>]',
@@ -84,11 +83,10 @@ export const CLI_USAGE_LINES = Object.freeze([
 
 export const CLI_USAGE_GROUPS = Object.freeze([
   Object.freeze({
-    id: 'server-diagnostics',
-    title: 'Server and Diagnostics',
+    id: 'diagnostics',
+    title: 'Diagnostics',
     commands: Object.freeze([
-      'server',
-      'health',
+          'health',
       'status',
       'windows',
       'doctor',

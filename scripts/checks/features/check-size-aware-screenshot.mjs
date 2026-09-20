@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -64,7 +64,7 @@ async function withFakeBridge(fn) {
   const receivedCommands = [];
   const pngBytes = Buffer.from('fake-png-size-guard');
   const dataUrl = `data:image/png;base64,${pngBytes.toString('base64')}`;
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -121,9 +121,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
     });
   } finally {
@@ -160,7 +160,7 @@ async function checkEnvelopeSizeGuard(tmpDir) {
 }
 
 async function checkCliSizeAwareScreenshot(tmpDir) {
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands }) => {
     const out = path.join(tmpDir, 'screenshot.png');
     const result = await runCli([
       'screenshot',
@@ -175,7 +175,7 @@ async function checkCliSizeAwareScreenshot(tmpDir) {
       'viewport',
       '--timeout-ms',
       '4444',
-    ], inheritedEnv({ CHROME_BRIDGE_URL: bridgeUrl }));
+    ], inheritedEnv({ CHROME_BRIDGE_SOCKET: socketPath }));
 
     check(result.ok, `size-aware screenshot CLI failed: ${result.stderr || result.stdout}`);
     const received = receivedCommands.find((command) => command.action === 'screenshot');

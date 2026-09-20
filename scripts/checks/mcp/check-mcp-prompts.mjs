@@ -28,7 +28,7 @@ async function withMcpClient(fn, env = {}) {
     command: process.execPath,
     args: [mcpPath],
     cwd: rootDir,
-    env: inheritedEnv({ CHROME_BRIDGE_URL: 'http://127.0.0.1:9', ...env }),
+    env: inheritedEnv({ CHROME_BRIDGE_SOCKET: '/tmp/chrome-bridge-unavailable.sock', ...env }),
     stderr: 'pipe',
   });
   const client = new Client({ name: 'chrome-bridge-mcp-prompts-check', version: '0.1.0' });

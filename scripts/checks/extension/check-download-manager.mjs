@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { execFile } from 'node:child_process';
-import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -183,7 +183,7 @@ async function withFakeDownloadBridge(fn) {
     },
   };
 
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url === '/command') {
       let body = '';
       req.setEncoding('utf8');
@@ -218,9 +218,9 @@ async function withFakeDownloadBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       calls,
       payload,
     });
@@ -338,8 +338,8 @@ const { download } = await importDownloadAction();
   );
 }
 
-await withFakeDownloadBridge(async ({ bridgeUrl, calls, payload }) => {
-  const env = { CHROME_BRIDGE_URL: bridgeUrl };
+await withFakeDownloadBridge(async ({ socketPath, calls, payload }) => {
+  const env = { CHROME_BRIDGE_SOCKET: socketPath };
 
   const missingConfirm = await runCli(['download', '--selector', '#export'], env);
   check(!missingConfirm.ok, 'CLI download must require --confirm');

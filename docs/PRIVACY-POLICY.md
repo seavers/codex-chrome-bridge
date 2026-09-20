@@ -28,7 +28,7 @@ The extension requests broad Chrome permissions because it works against the use
 
 - Mutating browser actions require explicit confirmation.
 - Private browser-data reads require additional confirmation.
-- Users can remove the extension, stop the bridge server, or delete local output artifacts at any time.
+- Users can remove the extension, stop the Native Messaging Host, or delete local output artifacts at any time.
 
 ## Retention
 

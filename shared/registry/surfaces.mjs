@@ -1,5 +1,4 @@
 export const CLI_COMMANDS = Object.freeze([
-  'server',
   'health',
   'status',
   'windows',

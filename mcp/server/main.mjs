@@ -25,15 +25,11 @@ import { summarizeDiagnosticsOutput } from '../../shared/diagnostics-output.mjs'
 import { buildToolAdvisor } from '../../shared/tool-advisor.mjs';
 import { appendActionRecording, summarizeActionRecording } from '../../shared/action-recording.mjs';
 import { buildPageSearch } from '../../shared/page-search.mjs';
-import {
-  bridgeFetchTimeoutSignal,
-  isAbortError,
-} from '../../shared/fetch-timeout.mjs';
 import { formatReadOutput } from '../../shared/output-envelope.mjs';
 import { withSessionGroupTitle } from '../../shared/session-group-title.mjs';
-import { bridgeSocketPath, nativeBridgeRequest } from '../../shared/native-bridge.mjs';
+import { bridgeSocketPath, nativeBridgeCommand, nativeBridgeHealth } from '../../shared/native-bridge.mjs';
 
-const BRIDGE_URL = process.env.CHROME_BRIDGE_URL || `unix://${bridgeSocketPath()}`;
+const BRIDGE_TRANSPORT = 'native-messaging+unix-socket';
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const execFileAsync = promisify(execFile);
 
@@ -90,34 +86,11 @@ const fullPageReadSchema = {
 };
 
 async function bridgeFetch(pathname, options = {}, timeoutMs = 30_000) {
-  if (BRIDGE_URL.startsWith('unix://')) {
-    if (pathname === '/health') return nativeBridgeRequest({ type: 'health' }, timeoutMs);
-    if (pathname !== '/command') throw new Error(`Unsupported native bridge path: ${pathname}`);
-    let body;
-    try { body = JSON.parse(options.body || '{}'); } catch { throw new Error('Invalid bridge command body'); }
-    return nativeBridgeRequest({ type: 'command', action: body.action, payload: body.payload || {} }, timeoutMs);
-  }
-  let response;
-  try {
-    response = await fetch(`${BRIDGE_URL}${pathname}`, { ...options, signal: options.signal || bridgeFetchTimeoutSignal(timeoutMs) });
-  } catch (error) {
-    if (isAbortError(error)) {
-      const timeoutError = new Error(`Bridge request timed out after ${timeoutMs} ms`);
-      timeoutError.code = 'BRIDGE_FETCH_TIMEOUT';
-      throw timeoutError;
-    }
-    throw error;
-  }
-  const text = await response.text();
-  let json;
-  try { json = JSON.parse(text); } catch { throw new Error(`Bridge returned non-JSON ${response.status}: ${text.slice(0, 500)}`); }
-  if (!response.ok || json.ok === false) {
-    const error = new Error(json.error || `Bridge returned HTTP ${response.status}`);
-    error.code = json.code;
-    error.details = json.details;
-    throw error;
-  }
-  return json;
+  if (pathname === '/health') return nativeBridgeHealth(timeoutMs);
+  if (pathname !== '/command') throw new Error(`Unsupported native bridge path: ${pathname}`);
+  let body;
+  try { body = JSON.parse(options.body || '{}'); } catch { throw new Error('Invalid bridge command body'); }
+  return nativeBridgeCommand(body.action, body.payload || {}, timeoutMs);
 }
 
 async function bridgeCommand(action, payload = {}, timeoutMs) {
@@ -362,7 +335,8 @@ async function sessionSummary() {
   }));
   return {
     generatedAt: new Date().toISOString(),
-    bridgeUrl: BRIDGE_URL,
+    bridgeTransport: BRIDGE_TRANSPORT,
+    socketPath: bridgeSocketPath(),
     health,
     workspace,
     group,
@@ -374,11 +348,11 @@ async function sessionSummary() {
 
 function summaryRecommendations(health, group, workspace) {
   const recommendations = [];
-  const bridgeVersion = health?.bridge?.version;
+  const bridgeVersion = health?.bridge?.version || health?.extension?.info?.version;
   const extensionVersion = health?.extension?.info?.version;
   const policyMode = workspace?.policy?.mode || workspace?.workspace?.policyMode;
   if (bridgeVersion && bridgeVersion !== BRIDGE_VERSION) {
-    recommendations.push(`Restart the local Chrome Bridge server; expected ${BRIDGE_VERSION}, got ${bridgeVersion}.`);
+    recommendations.push(`Restart the Native Messaging Host; expected ${BRIDGE_VERSION}, got ${bridgeVersion}.`);
   }
   if (extensionVersion && extensionVersion !== BRIDGE_VERSION) {
     recommendations.push(`Reload the unpacked extension; expected ${BRIDGE_VERSION}, got ${extensionVersion}.`);
@@ -397,14 +371,14 @@ function summaryRecommendations(health, group, workspace) {
 
 function summaryNextActions(health, group, workspace) {
   const actions = [];
-  const bridgeVersion = health?.bridge?.version;
+  const bridgeVersion = health?.bridge?.version || health?.extension?.info?.version;
   const extensionVersion = health?.extension?.info?.version;
   const extensionConnected = Boolean(health?.extension?.connected);
   const policyMode = workspace?.policy?.mode || workspace?.workspace?.policyMode;
   const hasScopedTabs = Boolean((workspace?.counts?.tabs > 0) || (Array.isArray(group?.tabs) && group.tabs.length));
 
   if (bridgeVersion && bridgeVersion !== BRIDGE_VERSION) {
-    actions.push('Restart the local Chrome Bridge server, then rerun chrome_bridge_doctor with liveChecks=true.');
+    actions.push('Restart the Native Messaging Host, then rerun chrome_bridge_doctor with liveChecks=true.');
     return actions;
   }
   if (extensionVersion && extensionVersion !== BRIDGE_VERSION) {
@@ -474,7 +448,8 @@ async function debugBundle(args = {}) {
   const includeTraceEvents = Boolean(args.includeTraceEvents);
   const manifest = {
     createdAt,
-    bridgeUrl: BRIDGE_URL,
+    bridgeTransport: BRIDGE_TRANSPORT,
+    socketPath: bridgeSocketPath(),
     files: [],
     privacy: {
       mode: 'redacted',
@@ -1020,7 +995,7 @@ server.prompt(
 
 server.tool(
   'chrome_bridge_health',
-  'Check whether the local Chrome bridge server and extension are connected.',
+  'Check whether the local Native Messaging Host and extension are connected.',
   {},
   async () => textResult(await bridgeFetch('/health')),
 );
@@ -1080,7 +1055,7 @@ server.tool(
 
 server.tool(
   'chrome_bridge_codex_config',
-  'Return the legacy Codex MCP configuration snippet for this local Chrome Bridge server using the current Node executable. This is offline and does not contact Chrome or the bridge.',
+  'Return the legacy Codex MCP configuration snippet for this local Chrome Bridge installation using the current Node executable. This is offline and does not contact Chrome or the bridge.',
   {},
   async () => textResult(await localCliText('codex-config')),
 );

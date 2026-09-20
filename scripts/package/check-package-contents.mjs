@@ -14,7 +14,7 @@ const REQUIRED_PACKAGE_FILES = Object.freeze([
   'bin/cli/main.mjs',
   'mcp/chrome-bridge-mcp.mjs',
   'mcp/server/main.mjs',
-  'server/bridge-server.mjs',
+  'native/host.mjs',
   'shared/action-recording.mjs',
   'shared/command-registry.mjs',
   'shared/registry/actions.mjs',

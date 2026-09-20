@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -115,7 +115,7 @@ async function withFakeActBridge(fn) {
     type: 0,
   };
 
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url === '/command') {
       let body = '';
       req.setEncoding('utf8');
@@ -184,9 +184,9 @@ async function withFakeActBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       counts,
       state,
     });
@@ -215,9 +215,9 @@ async function withMcpClient(env, fn) {
 
 const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-bridge-act-apply-check-'));
 
-await withFakeActBridge(async ({ bridgeUrl, counts, state }) => {
+await withFakeActBridge(async ({ socketPath, counts, state }) => {
   const env = {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_ACT_PREVIEW_STATE_DIR: stateDir,
   };
 
@@ -305,9 +305,9 @@ await withFakeActBridge(async ({ bridgeUrl, counts, state }) => {
   check(!staleByNavigation.ok, 'CLI act-apply must reject stale preview ids after navigation');
 });
 
-await withFakeActBridge(async ({ bridgeUrl }) => {
+await withFakeActBridge(async ({ socketPath }) => {
   const env = {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_ACT_PREVIEW_STATE_DIR: stateDir,
   };
   const mcpParsed = await withMcpClient(env, async (client) => {

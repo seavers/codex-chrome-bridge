@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +33,7 @@ async function runCli(args, env = {}) {
       cwd: rootDir,
       env: {
         ...process.env,
-        CHROME_BRIDGE_URL: 'http://127.0.0.1:9',
+        CHROME_BRIDGE_SOCKET: '/tmp/chrome-bridge-unavailable.sock',
         ...env,
       },
       timeout: 10_000,
@@ -58,7 +58,7 @@ async function withFakeLiveDoctor(fn) {
   await fs.writeFile(fakeOsascript, '#!/bin/sh\nprintf "Codex Bridge Fake Chrome Title\\n"\n');
   await fs.chmod(fakeOsascript, 0o755);
 
-  const server = http.createServer((req, res) => {
+  const server = createFakeNativeBridge((req, res) => {
     if (req.url !== '/health') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -86,9 +86,9 @@ async function withFakeLiveDoctor(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       pathEnv: `${fakeBinDir}${path.delimiter}${process.env.PATH || ''}`,
     });
   } finally {
@@ -99,7 +99,7 @@ async function withFakeLiveDoctor(fn) {
 
 async function withFakeStaleSummaryBridge(fn) {
   const staleBridgeVersion = '0.0.0-stale-summary';
-  const server = http.createServer((req, res) => {
+  const server = createFakeNativeBridge((req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({
@@ -137,9 +137,9 @@ async function withFakeStaleSummaryBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       staleBridgeVersion,
     });
   } finally {
@@ -150,7 +150,7 @@ async function withFakeStaleSummaryBridge(fn) {
 async function withFakeCommandBridge(fn) {
   const receivedCommands = [];
   const invalidPayloadRequests = [];
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -207,9 +207,9 @@ async function withFakeCommandBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
       invalidPayloadRequests,
     });
@@ -243,9 +243,9 @@ if (doctorJson) {
 }
 
 let liveDoctorBridgeCurrent = null;
-await withFakeLiveDoctor(async ({ bridgeUrl, pathEnv }) => {
+await withFakeLiveDoctor(async ({ socketPath, pathEnv }) => {
   const liveDoctorResult = await runCli(['doctor', '--live-checks'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     PATH: pathEnv,
   });
   check(liveDoctorResult.ok, 'CLI doctor --live-checks must succeed against fake health and fake osascript');
@@ -260,48 +260,20 @@ await withFakeLiveDoctor(async ({ bridgeUrl, pathEnv }) => {
   liveDoctorBridgeCurrent = liveDoctorJson.checks?.bridgeCurrent;
 });
 
-let serverPortChecks = 0;
-const serverPortInvalidCases = [
-  {
-    label: 'invalid --port',
-    args: ['server', '--port', 'nope'],
-    env: {},
-  },
-  {
-    label: 'too large --port',
-    args: ['server', '--port', '65536'],
-    env: {},
-  },
-  {
-    label: 'invalid CHROME_BRIDGE_PORT',
-    args: ['server'],
-    env: { CHROME_BRIDGE_PORT: 'nope' },
-  },
-];
-for (const testCase of serverPortInvalidCases) {
-  const rejected = await runCli(testCase.args, testCase.env);
-  check(!rejected.ok, `CLI server ${testCase.label} must fail`);
-  check(
-    `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('port must be an integer between 0 and 65535'),
-    `CLI server ${testCase.label} rejection must explain port bounds`,
-  );
-  serverPortChecks += 1;
-}
-
 let sessionSummaryStaleBridgeRecommendation = false;
-await withFakeStaleSummaryBridge(async ({ bridgeUrl, staleBridgeVersion }) => {
+await withFakeStaleSummaryBridge(async ({ socketPath, staleBridgeVersion }) => {
   const summaryResult = await runCli(['session-summary'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
   });
   check(summaryResult.ok, 'CLI session-summary must succeed against fake stale bridge health');
   const summaryJson = parseJsonOutput(summaryResult, 'CLI session-summary stale bridge');
   if (!summaryJson) return;
 
   sessionSummaryStaleBridgeRecommendation = summaryJson.recommendations?.some((recommendation) => (
-    recommendation.includes('Restart the local Chrome Bridge server')
+    recommendation.includes('Restart the Native Messaging Host')
       && recommendation.includes(staleBridgeVersion)
   ));
-  check(sessionSummaryStaleBridgeRecommendation, 'CLI session-summary must recommend restarting stale bridge server');
+  check(sessionSummaryStaleBridgeRecommendation, 'CLI session-summary must recommend restarting stale Native Messaging Host');
   check(summaryJson.nextActions?.some((action) => action.includes('doctor --live-checks')), 'CLI session-summary must include a concrete stale-bridge next action');
 });
 
@@ -319,10 +291,10 @@ let privateLimitChecks = 0;
 let readLimitChecks = 0;
 let utilityNumberChecks = 0;
 let profileRoutingChecks = 0;
-await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayloadRequests }) => {
+await withFakeCommandBridge(async ({ socketPath, receivedCommands, invalidPayloadRequests }) => {
   const beforeProfileRoute = receivedCommands.length;
   const profileRouteResult = await runCli(['tabs'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_PROFILE_ID: 'profile-cli-check',
   });
   check(profileRouteResult.ok, 'CLI must succeed when CHROME_BRIDGE_PROFILE_ID is configured');
@@ -339,7 +311,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
 
   for (const testCase of includeAllCases) {
     const beforeReject = receivedCommands.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI ${testCase.args[0]} --all must fail without --confirm`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes(`${testCase.args[0]} --all requires --confirm`),
@@ -349,7 +321,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
     inventoryIncludeAllChecks += 1;
 
     const beforeAccept = receivedCommands.length;
-    const accepted = await runCli(testCase.confirmedArgs, { CHROME_BRIDGE_URL: bridgeUrl });
+    const accepted = await runCli(testCase.confirmedArgs, { CHROME_BRIDGE_SOCKET: socketPath });
     check(accepted.ok, `CLI ${testCase.args[0]} --all --confirm must succeed against fake command bridge`);
     const parsed = parseJsonOutput(accepted, `CLI ${testCase.args[0]} --all --confirm fake command bridge`);
     const commandPayload = receivedCommands[beforeAccept]?.payload || parsed?.payload;
@@ -385,7 +357,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
 
   for (const testCase of sensitiveCases) {
     const beforeReject = receivedCommands.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI ${testCase.command} private-sensitive request must fail without --confirm-sensitive`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('confirmSensitive=true'),
@@ -395,7 +367,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
     privateSensitiveChecks += 1;
 
     const beforeAccept = receivedCommands.length;
-    const accepted = await runCli(testCase.confirmedArgs, { CHROME_BRIDGE_URL: bridgeUrl });
+    const accepted = await runCli(testCase.confirmedArgs, { CHROME_BRIDGE_SOCKET: socketPath });
     check(accepted.ok, `CLI ${testCase.command} --confirm-sensitive must succeed against fake command bridge`);
     const parsed = parseJsonOutput(accepted, `CLI ${testCase.command} --confirm-sensitive fake command bridge`);
     const commandPayload = receivedCommands[beforeAccept]?.payload || parsed?.payload;
@@ -427,7 +399,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
 
   for (const testCase of unsafeCases) {
     const beforeReject = receivedCommands.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI ${testCase.command} unsafe URL/method case must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes(testCase.expected),
@@ -440,7 +412,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   check(COMMAND_PAYLOAD_SCHEMAS.select?.includes('index'), 'select schema must allow index before CLI behavior checks');
   const beforeMissingSelectTarget = receivedCommands.length;
   const beforeMissingSelectTargetRejects = invalidPayloadRequests.length;
-  const missingSelectTarget = await runCli(['select', '--selector', '#country', '--confirm'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const missingSelectTarget = await runCli(['select', '--selector', '#country', '--confirm'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(!missingSelectTarget.ok, 'CLI select without value, label, or index must fail');
   check(
     `${missingSelectTarget.stderr}\n${missingSelectTarget.stdout}\n${missingSelectTarget.error}`.includes('select requires value, label, or index'),
@@ -459,7 +431,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const invalidIndex of ['nope', '-1']) {
     const beforeInvalidSelectIndex = receivedCommands.length;
     const beforeInvalidSelectIndexRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(['select', '--selector', '#country', '--index', invalidIndex, '--confirm'], { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(['select', '--selector', '#country', '--index', invalidIndex, '--confirm'], { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI select --index ${invalidIndex} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('--index must be a non-negative integer'),
@@ -474,7 +446,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   }
 
   const beforeSelectIndex = receivedCommands.length;
-  const selectIndex = await runCli(['select', '--selector', '#country', '--index', '0', '--confirm'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const selectIndex = await runCli(['select', '--selector', '#country', '--index', '0', '--confirm'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(selectIndex.ok, 'CLI select with index 0 must succeed against fake command bridge');
   const selectIndexParsed = parseJsonOutput(selectIndex, 'CLI select index 0 fake command bridge');
   const selectIndexPayload = receivedCommands[beforeSelectIndex]?.payload || selectIndexParsed?.payload;
@@ -487,7 +459,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const invalidTab of ['nope', '-1']) {
     const beforeInvalidTab = receivedCommands.length;
     const beforeInvalidTabRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(['snapshot', '--tab', invalidTab], { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(['snapshot', '--tab', invalidTab], { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI snapshot --tab ${invalidTab} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('--tab must be a non-negative integer'),
@@ -502,7 +474,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   }
 
   const beforeZeroTab = receivedCommands.length;
-  const zeroTab = await runCli(['snapshot', '--tab', '0'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const zeroTab = await runCli(['snapshot', '--tab', '0'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(zeroTab.ok, 'CLI snapshot --tab 0 must succeed against fake command bridge');
   const zeroTabParsed = parseJsonOutput(zeroTab, 'CLI snapshot --tab 0 fake command bridge');
   const zeroTabPayload = receivedCommands[beforeZeroTab]?.payload || zeroTabParsed?.payload;
@@ -519,7 +491,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const testCase of clickAtInvalidCases) {
     const beforeInvalidClickAt = receivedCommands.length;
     const beforeInvalidClickAtRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI click-at ${testCase.label} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('click-at requires numeric --x and --y'),
@@ -534,7 +506,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   }
 
   const beforeClickAtZero = receivedCommands.length;
-  const clickAtZero = await runCli(['click-at', '--x', '0', '--y', '0', '--confirm'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const clickAtZero = await runCli(['click-at', '--x', '0', '--y', '0', '--confirm'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(clickAtZero.ok, 'CLI click-at 0,0 must succeed against fake command bridge');
   const clickAtZeroParsed = parseJsonOutput(clickAtZero, 'CLI click-at 0,0 fake command bridge');
   const clickAtZeroPayload = receivedCommands[beforeClickAtZero]?.payload || clickAtZeroParsed?.payload;
@@ -554,7 +526,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const testCase of hoverInvalidCases) {
     const beforeInvalidHover = receivedCommands.length;
     const beforeInvalidHoverRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI hover ${testCase.label} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('hover requires --selector or numeric --x and --y'),
@@ -569,7 +541,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   }
 
   const beforeHoverSelector = receivedCommands.length;
-  const hoverSelector = await runCli(['hover', '--selector', '#action'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const hoverSelector = await runCli(['hover', '--selector', '#action'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(hoverSelector.ok, 'CLI hover selector must succeed against fake command bridge');
   const hoverSelectorParsed = parseJsonOutput(hoverSelector, 'CLI hover selector fake command bridge');
   const hoverSelectorPayload = receivedCommands[beforeHoverSelector]?.payload || hoverSelectorParsed?.payload;
@@ -579,7 +551,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   hoverCoordinateChecks += 1;
 
   const beforeHoverTrustedZero = receivedCommands.length;
-  const hoverTrustedZero = await runCli(['hover', '--x', '0', '--y', '0', '--trusted'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const hoverTrustedZero = await runCli(['hover', '--x', '0', '--y', '0', '--trusted'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(hoverTrustedZero.ok, 'CLI hover trusted 0,0 must succeed against fake command bridge');
   const hoverTrustedZeroParsed = parseJsonOutput(hoverTrustedZero, 'CLI hover trusted 0,0 fake command bridge');
   const hoverTrustedZeroPayload = receivedCommands[beforeHoverTrustedZero]?.payload || hoverTrustedZeroParsed?.payload;
@@ -597,7 +569,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const testCase of traceMaxEventsInvalidCases) {
     const beforeInvalidTrace = receivedCommands.length;
     const beforeInvalidTraceRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI trace-start ${testCase.label} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes('--max-events must be between 50 and 2000'),
@@ -612,7 +584,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   }
 
   const beforeTraceMaxEventsMin = receivedCommands.length;
-  const traceMaxEventsMin = await runCli(['trace-start', '--max-events', '50', '--confirm'], { CHROME_BRIDGE_URL: bridgeUrl });
+  const traceMaxEventsMin = await runCli(['trace-start', '--max-events', '50', '--confirm'], { CHROME_BRIDGE_SOCKET: socketPath });
   check(traceMaxEventsMin.ok, 'CLI trace-start --max-events 50 must succeed against fake command bridge');
   const traceMaxEventsMinParsed = parseJsonOutput(traceMaxEventsMin, 'CLI trace-start max-events 50 fake command bridge');
   const traceMaxEventsMinPayload = receivedCommands[beforeTraceMaxEventsMin]?.payload || traceMaxEventsMinParsed?.payload;
@@ -656,7 +628,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const testCase of privateLimitInvalidCases) {
     const beforeInvalidLimit = receivedCommands.length;
     const beforeInvalidLimitRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI ${testCase.label} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes(testCase.message),
@@ -699,7 +671,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   ];
   for (const testCase of privateLimitValidCases) {
     const beforeValidLimit = receivedCommands.length;
-    const accepted = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const accepted = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(accepted.ok, `CLI ${testCase.label} must succeed against fake command bridge`);
     const parsed = parseJsonOutput(accepted, `CLI ${testCase.label} fake command bridge`);
     const commandPayload = receivedCommands[beforeValidLimit]?.payload || parsed?.payload;
@@ -779,7 +751,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const testCase of readLimitInvalidCases) {
     const beforeInvalidReadLimit = receivedCommands.length;
     const beforeInvalidReadLimitRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI ${testCase.label} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes(testCase.message),
@@ -851,7 +823,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   ];
   for (const testCase of readLimitValidCases) {
     const beforeValidReadLimit = receivedCommands.length;
-    const accepted = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const accepted = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(accepted.ok, `CLI ${testCase.label} must succeed against fake command bridge`);
     const parsed = parseJsonOutput(accepted, `CLI ${testCase.label} fake command bridge`);
     const commandPayload = receivedCommands[beforeValidReadLimit]?.payload || parsed?.payload;
@@ -907,7 +879,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   for (const testCase of utilityNumberInvalidCases) {
     const beforeInvalidUtilityNumber = receivedCommands.length;
     const beforeInvalidUtilityNumberRejects = invalidPayloadRequests.length;
-    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const rejected = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(!rejected.ok, `CLI ${testCase.label} must fail`);
     check(
       `${rejected.stderr}\n${rejected.stdout}\n${rejected.error}`.includes(testCase.message),
@@ -956,7 +928,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   ];
   for (const testCase of utilityNumberValidCases) {
     const beforeValidUtilityNumber = receivedCommands.length;
-    const accepted = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const accepted = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(accepted.ok, `CLI ${testCase.label} must succeed against fake command bridge`);
     const parsed = parseJsonOutput(accepted, `CLI ${testCase.label} fake command bridge`);
     const receivedCommand = receivedCommands[beforeValidUtilityNumber];
@@ -987,7 +959,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
     check(COMMAND_PAYLOAD_SCHEMAS[testCase.action]?.includes('groupTitle'), `${testCase.action} schema must allow groupTitle before CLI behavior checks`);
     check(COMMAND_PAYLOAD_SCHEMAS[testCase.action]?.includes('groupColor'), `${testCase.action} schema must allow groupColor before CLI behavior checks`);
     const before = receivedCommands.length;
-    const result = await runCli(testCase.args, { CHROME_BRIDGE_URL: bridgeUrl });
+    const result = await runCli(testCase.args, { CHROME_BRIDGE_SOCKET: socketPath });
     check(result.ok, `CLI ${testCase.args[0]} must succeed against fake command bridge`);
     const parsed = parseJsonOutput(result, `CLI ${testCase.args[0]} fake command bridge`);
     const commandPayload = receivedCommands[before]?.payload || parsed?.payload;
@@ -1001,7 +973,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   const sessionGroupTitle = 'Codex Bridge - Kurerok Research';
   const beforeSessionDefault = receivedCommands.length;
   const sessionDefaultResult = await runCli(['ensure-tab', 'https://example.com/session'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_SESSION_TITLE: sessionTitle,
   });
   check(sessionDefaultResult.ok, 'CLI ensure-tab must succeed with CHROME_BRIDGE_SESSION_TITLE');
@@ -1013,7 +985,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
 
   const beforeSessionRead = receivedCommands.length;
   const sessionReadResult = await runCli(['text', '--summary-only'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_SESSION_TITLE: sessionTitle,
   });
   check(sessionReadResult.ok, 'CLI text must succeed with CHROME_BRIDGE_SESSION_TITLE');
@@ -1025,7 +997,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
 
   const beforeSessionOverride = receivedCommands.length;
   const sessionOverrideResult = await runCli(['open', 'https://example.com/override', '--new', '--group-title', groupTitle], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_SESSION_TITLE: sessionTitle,
   });
   check(sessionOverrideResult.ok, 'CLI explicit group title must succeed with session title env');
@@ -1038,7 +1010,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   const threadId = '019ea301-5db2-7890-9d21-b1b928e6f521';
   const beforeThreadDefault = receivedCommands.length;
   const threadDefaultResult = await runCli(['group'], {
-    CHROME_BRIDGE_URL: bridgeUrl,
+    CHROME_BRIDGE_SOCKET: socketPath,
     CHROME_BRIDGE_SESSION_TITLE: '',
     CODEX_SESSION_TITLE: '',
     CODEX_THREAD_TITLE: '',
@@ -1133,7 +1105,6 @@ process.stdout.write(`${JSON.stringify({
   checkedCommands: ['doctor', 'extension-path', 'mcp-config', 'codex-config', 'command-catalog'],
   doctorOfflineByDefault: true,
   doctorLiveBridgeCurrent: liveDoctorBridgeCurrent,
-  serverPortChecks,
   sessionSummaryStaleBridgeRecommendation,
   inventoryIncludeAllChecks,
   privateSensitiveChecks,

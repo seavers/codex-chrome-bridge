@@ -22,7 +22,7 @@ This plan applies Jeffrey's "Code Reorganizer" workflow to Chrome MCP Bridge. I 
 The repository is already split by runtime surface:
 
 - `extension/` owns Chrome extension APIs.
-- `server/` owns the local HTTP/WebSocket bridge.
+- `server/` owns the local Native Messaging Unix Socket bridge.
 - `bin/` owns the CLI entrypoint.
 - `mcp/` owns the stdio MCP server entrypoint.
 - `shared/` owns cross-surface helpers and the command contract.
@@ -76,7 +76,7 @@ It currently contains:
 - profile filtering
 - tool registration for every MCP tool
 
-`server/bridge-server.mjs` is moderate-large but cohesive. It owns the bridge process boundary, extension connection lifecycle, direct command validation, origin checks, long-poll fallback, and shutdown cleanup.
+`native/host.mjs` is moderate-large but cohesive. It owns the bridge process boundary, extension connection lifecycle, direct command validation, origin checks, long-poll fallback, and shutdown cleanup.
 
 ### Extension Surface
 
@@ -572,7 +572,7 @@ Verification:
 
 ### Phase 7: Optional Server Split
 
-`server/bridge-server.mjs` is large but cohesive. Splitting it should be lower priority than CLI/MCP/registry/page-scripts.
+`native/host.mjs` is large but cohesive. Splitting it should be lower priority than CLI/MCP/registry/page-scripts.
 
 If split later:
 
@@ -580,7 +580,7 @@ If split later:
 - `server/internal/extension-session.mjs`
 - `server/internal/command-ingress.mjs`
 
-Keep `server/bridge-server.mjs` exporting:
+Keep `native/host.mjs` exporting:
 
 - `parseBridgePort`
 - `createBridgeServer`
@@ -617,7 +617,7 @@ The three large checker files can be split after runtime modules move, because t
 
 Do not split these immediately:
 
-- `server/bridge-server.mjs`: large but single responsibility.
+- `native/host.mjs`: large but single responsibility.
 - `shared/structured-extract.mjs`: large-ish but cohesive.
 - `shared/tool-advisor.mjs`: cohesive deterministic advisor logic.
 - `extension/navigation-actions.js`: moderately large but coherent.

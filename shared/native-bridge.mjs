@@ -65,6 +65,14 @@ export function nativeBridgeRequest(request, timeoutMs = 30_000) {
   });
 }
 
+export function nativeBridgeHealth(timeoutMs = 30_000) {
+  return nativeBridgeRequest({ type: 'health' }, timeoutMs);
+}
+
+export function nativeBridgeCommand(action, payload = {}, timeoutMs = 30_000) {
+  return nativeBridgeRequest({ type: 'command', action, payload, timeoutMs }, timeoutMs);
+}
+
 export function bridgeSocketPath() {
   return socketPath();
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -64,7 +64,7 @@ async function withFakeBridge(fn) {
   let nextTabId = 700;
   const receivedCommands = [];
   let failNextRead = false;
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -163,9 +163,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
       failReadOnce: () => {
         failNextRead = true;
@@ -228,9 +228,9 @@ try {
   check(partialState.tabs['44']?.title === 'valid', 'run state must preserve valid tab metadata while skipping malformed tab keys');
   check(!Object.prototype.hasOwnProperty.call(partialState.tabs, 'bad-tab-id'), 'run state must skip malformed tab metadata keys');
 
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands, failReadOnce }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands, failReadOnce }) => {
     const env = inheritedEnv({
-      CHROME_BRIDGE_URL: bridgeUrl,
+      CHROME_BRIDGE_SOCKET: socketPath,
       CHROME_BRIDGE_RUN_STATE_DIR: stateDir,
     });
 

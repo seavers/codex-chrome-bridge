@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -131,7 +131,7 @@ function checkResultShape(result, label) {
 async function withFakeBridge(fn) {
   const receivedCommands = [];
   const trace = fixtureTrace();
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -163,9 +163,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
       trace,
     });
@@ -214,7 +214,7 @@ try {
   }
   check(sensitiveRejected, 'Direct helper must require confirmSensitive for includeHeaders/includeBodies');
 
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands }) => {
     const cliResult = await runCli([
       'network-export',
       '--artifact-dir',
@@ -227,7 +227,7 @@ try {
       path.join(tempDir, 'cli-har.json'),
       '--limit',
       '50',
-    ], { CHROME_BRIDGE_URL: bridgeUrl });
+    ], { CHROME_BRIDGE_SOCKET: socketPath });
     check(cliResult.ok, `CLI network-export must succeed: ${cliResult.stderr || cliResult.error || cliResult.stdout}`);
     const cliJson = parseJson(cliResult.stdout, 'CLI network-export');
     checkResultShape(cliJson, 'CLI network-export');
@@ -239,17 +239,17 @@ try {
       '--artifact-dir',
       tempDir,
       '--include-headers',
-    ], { CHROME_BRIDGE_URL: bridgeUrl });
+    ], { CHROME_BRIDGE_SOCKET: socketPath });
     check(!sensitiveCli.ok, 'CLI network-export must reject include-headers without confirm-sensitive');
   });
 
-  await withMcpClient({ CHROME_BRIDGE_URL: 'http://127.0.0.1:9' }, async (client) => {
+  await withMcpClient({ CHROME_BRIDGE_SOCKET: '/tmp/chrome-bridge-unavailable.sock' }, async (client) => {
     const tools = await client.listTools();
     check(tools.tools.some((tool) => tool.name === 'chrome_bridge_network_export'), 'MCP listTools must include chrome_bridge_network_export');
   });
 
-  await withFakeBridge(async ({ bridgeUrl }) => {
-    await withMcpClient({ CHROME_BRIDGE_URL: bridgeUrl }, async (client) => {
+  await withFakeBridge(async ({ socketPath }) => {
+    await withMcpClient({ CHROME_BRIDGE_SOCKET: socketPath }, async (client) => {
       const result = await client.callTool({
         name: 'chrome_bridge_network_export',
         arguments: {

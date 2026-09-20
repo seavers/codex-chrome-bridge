@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { createFakeNativeBridge } from '../lib/fake-native-bridge.mjs';
 import fs from 'node:fs/promises';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -95,7 +95,7 @@ const sampleHtml = `<!doctype html>
 
 async function withFakeBridge(fn) {
   const receivedCommands = [];
-  const server = http.createServer(async (req, res) => {
+  const server = createFakeNativeBridge(async (req, res) => {
     if (req.url !== '/command' || req.method !== 'POST') {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'unexpected path' }));
@@ -166,9 +166,9 @@ async function withFakeBridge(fn) {
   });
 
   try {
-    const { port } = server.address();
+    const { path: socketPath } = server.address();
     return await fn({
-      bridgeUrl: `http://127.0.0.1:${port}`,
+      socketPath: socketPath,
       receivedCommands,
     });
   } finally {
@@ -224,7 +224,7 @@ async function checkPureExtraction(tmpDir) {
 }
 
 async function checkCliPreset(tmpDir) {
-  await withFakeBridge(async ({ bridgeUrl, receivedCommands }) => {
+  await withFakeBridge(async ({ socketPath, receivedCommands }) => {
     const out = path.join(tmpDir, 'offer.json');
     const rawDir = path.join(tmpDir, 'raw');
     const result = await runCli([
@@ -239,7 +239,7 @@ async function checkCliPreset(tmpDir) {
       out,
       '--artifact-dir',
       rawDir,
-    ], inheritedEnv({ CHROME_BRIDGE_URL: bridgeUrl }));
+    ], inheritedEnv({ CHROME_BRIDGE_SOCKET: socketPath }));
 
     check(result.ok, `cpa-offer CLI preset failed: ${result.stderr || result.stdout}`);
     check(JSON.stringify(result.parsed).length < 12_000, 'cpa-offer CLI stdout JSON must stay under 12k chars');
