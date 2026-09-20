@@ -1,5 +1,4 @@
 import { extensionErrorCode, extensionErrorDetails } from './extension-errors.js';
-import { startBridge } from './offscreen-lifecycle.js';
 import { printPdf, screenshot } from './page-artifacts.js';
 import {
   activateTab,
@@ -76,17 +75,10 @@ import {
   emulateNetwork,
   setViewport,
 } from './emulation-actions.js';
-chrome.runtime.onInstalled.addListener(startBridge);
-chrome.runtime.onStartup.addListener(startBridge);
-chrome.action.onClicked.addListener(startBridge);
-chrome.alarms.create('codex-bridge-ensure-offscreen', { periodInMinutes: 1 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'codex-bridge-ensure-offscreen') startBridge();
-});
 const NATIVE_HOST_NAME = 'com.codex.chrome_bridge';
-const EXTENSION_NAME = 'Chrome MCP Bridge';
-const EXTENSION_VERSION = '0.4.1';
-const SOCKET_PATH = '/tmp/codex-chrome-bridge.sock';
+const EXTENSION_METADATA = chrome.runtime.getManifest();
+const EXTENSION_NAME = EXTENSION_METADATA.name;
+const EXTENSION_VERSION = EXTENSION_METADATA.version;
 const RECONNECT_MS = 1500;
 let nativePort = null;
 let reconnectTimer = null;
@@ -97,7 +89,6 @@ connectNativeHost();
 
 installTabGroupPersistenceListeners();
 enforceManagedTabGroupPersistence().catch(() => {});
-startBridge();
 
 if (chrome.debugger?.onEvent) {
   chrome.debugger.onEvent.addListener((source, method, params) => {
@@ -210,7 +201,7 @@ async function nativeHello() {
 }
 
 function publishBridgeStatus(status) {
-  const nextStatus = { ...status, updatedAt: Date.now(), transport: 'native-messaging+unix-socket', socketPath: SOCKET_PATH };
+  const nextStatus = { ...status, updatedAt: Date.now(), transport: 'native-messaging+unix-socket' };
   latestBridgeStatus = nextStatus;
   updateActionStatus(nextStatus);
   nativeStorageSet({ codexBridgeStatus: nextStatus }).catch(() => {});

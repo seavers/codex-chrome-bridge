@@ -13,7 +13,6 @@ The `extension/` directory contains a Manifest V3 extension:
 - `extension-errors.js` classifies extension-side command failures into stable bridge error codes.
 - `keyboard-events.js` owns Chrome Debugger key-event payload mapping for trusted keyboard input.
 - `navigation-actions.js` owns tab/window inventory, workspace status/configuration, tab creation/adoption, scoped closes, and basic navigation actions.
-- `offscreen-lifecycle.js` owns creation and retry-safe startup of the MV3 offscreen bridge document.
 - `page-artifacts.js` owns screenshot and PDF artifact capture.
 - `page-execution.js` owns the `chrome.scripting.executeScript` execution boundary for injected page helpers.
 - `page-interactions.js` owns page mutation, trusted input, dialog, and file-upload actions.
@@ -29,14 +28,13 @@ The `extension/` directory contains a Manifest V3 extension:
 - `user-prompts.js` owns human-in-the-loop prompt state, prompt tab lifecycle, and answer completion.
 - `workspace-policy.js` owns local workspace defaults and scoped policy normalization.
 - `workspace-tabs.js` owns scoped workspace tab/group targeting and extension-local workspace storage state, including the bounded remembered-title list used by tab-group persistence sweeps and Chrome session storage for browser-session group IDs.
-- `offscreen.html` and `offscreen.js` connect to `com.codex.chrome_bridge` through Chrome Native Messaging and relay requests to the local Unix Socket.
 - `ask.html` and `ask.js` provide a local human-in-the-loop prompt page.
 
 The extension is the only component that talks directly to Chrome extension APIs.
 
 ## Native Messaging Host
 
-`native/host.mjs` is started by Chrome when the extension calls `chrome.runtime.connectNative()`. It owns the per-user Unix Socket at `/tmp/codex-chrome-bridge.sock` and relays newline-delimited CLI/MCP requests to the extension over Native Messaging.
+`native/host.mjs` is started by Chrome when the extension service worker calls `chrome.runtime.connectNative()`. It owns one per-user Unix Socket in Node's temporary directory and relays newline-delimited CLI/MCP requests to the extension over Native Messaging. The service worker is the only extension transport owner; there is no second Offscreen connection.
 
 It exposes:
 
@@ -106,7 +104,7 @@ The MCP server is intentionally thin:
 
 ```text
 MCP client or CLI
-  -> Unix Socket /tmp/codex-chrome-bridge.sock
+  -> Unix Socket reported by the Native Messaging Host
   -> Native Messaging Host
   -> Chrome extension Native Messaging port
   -> Chrome extension APIs / page scripts / Chrome Debugger

@@ -68,7 +68,6 @@ The extension currently requests:
 - `cookies`
 - `debugger`
 - `history`
-- `offscreen`
 - `scripting`
 - `storage`
 - `tabGroups`

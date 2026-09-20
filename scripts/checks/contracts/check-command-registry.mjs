@@ -56,7 +56,6 @@ const [
   focusContextText,
   keyboardEventsText,
   navigationActionsText,
-  offscreenLifecycleText,
   pageExecutionText,
   pageArtifactsText,
   pageReadActionsText,
@@ -99,7 +98,6 @@ const [
   fs.readFile(path.join(rootDir, 'extension/focus-context.js'), 'utf8').catch(() => ''),
   fs.readFile(path.join(rootDir, 'extension/keyboard-events.js'), 'utf8').catch(() => ''),
   fs.readFile(path.join(rootDir, 'extension/navigation-actions.js'), 'utf8').catch(() => ''),
-  fs.readFile(path.join(rootDir, 'extension/offscreen-lifecycle.js'), 'utf8'),
   fs.readFile(path.join(rootDir, 'extension/page-execution.js'), 'utf8').catch(() => ''),
   fs.readFile(path.join(rootDir, 'extension/page-artifacts.js'), 'utf8').catch(() => ''),
   fs.readFile(path.join(rootDir, 'extension/page-read-actions.js'), 'utf8').catch(() => ''),
@@ -293,7 +291,6 @@ for (const requiredPackageFile of [
   'extension/page-scripts.js',
   'extension/page-scripts/main.js',
   'extension/navigation-actions.js',
-  'extension/offscreen-lifecycle.js',
   'extension/page-execution.js',
   'extension/page-artifacts.js',
   'extension/page-read-actions.js',
@@ -1272,11 +1269,8 @@ check(functionBlock(extensionErrorsText, 'extensionErrorDetails').includes('deta
 check(focusContextText.includes('export async function withUserFocusPreserved'), 'extension focus context module must export shared focus preservation helper');
 check(functionBlock(focusContextText, 'withUserFocusPreserved').includes('captureUserFocusContext'), 'extension focus context helper must capture current user focus before background work');
 check(functionBlock(focusContextText, 'restoreUserFocusContext').includes('chrome.windows.update'), 'extension focus context helper must restore the previously focused window when possible');
-check(backgroundText.includes("import { startBridge } from './offscreen-lifecycle.js';"), 'extension background must import offscreen lifecycle helper from extension/offscreen-lifecycle.js');
-check(!backgroundText.includes('function ensureOffscreen'), 'extension background must not own offscreen lifecycle internals');
-check(!backgroundText.includes('async function startBridge'), 'extension background must not own offscreen lifecycle internals');
-check(functionBlock(offscreenLifecycleText, 'ensureOffscreen').includes('chrome.offscreen.createDocument'), 'offscreen lifecycle module must create the offscreen document');
-check(functionBlock(offscreenLifecycleText, 'startBridge').includes('ensureOffscreen'), 'offscreen lifecycle module must export startup retry helper');
+check(backgroundText.includes("chrome.runtime.connectNative('com.codex.chrome_bridge')") || backgroundText.includes('chrome.runtime.connectNative(NATIVE_HOST_NAME)'), 'extension background must own the Native Messaging connection');
+check(!backgroundText.includes('chrome.offscreen'), 'extension background must not depend on the removed offscreen transport');
 check(pageInteractionsText.includes("import { execute } from './page-execution.js';"), 'extension page interactions must import page execution helper from extension/page-execution.js');
 check(!functionBlock(backgroundText, 'execute'), 'extension background must not own page execution helper internals');
 check(pageExecutionText.includes('export async function execute'), 'extension page execution module must export execute');

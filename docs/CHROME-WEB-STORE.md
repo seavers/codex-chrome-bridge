@@ -44,7 +44,7 @@ Developer Tools
 - `history`: search browser history only when the caller confirms the read.
 - `bookmarks`: search bookmarks only when the caller confirms the read.
 - `storage`: store local bridge workspace state and inspect page storage only behind confirmation gates.
-- `offscreen`: maintain the local bridge connection from a Manifest V3 extension context.
+- `nativeMessaging`: connect the extension service worker to the local bridge host.
 - `alarms`: keep extension lifecycle checks lightweight and local.
 - `<all_urls>`: support the user's real logged-in Chrome pages across sites after explicit scoping and confirmation.
 

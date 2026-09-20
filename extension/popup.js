@@ -1,7 +1,7 @@
 const DEFAULT_STATUS = {
   state: 'disconnected',
   detail: '尚未连接到本地服务',
-  bridgeUrl: 'unix:///tmp/codex-chrome-bridge.sock',
+  transport: 'native-messaging+unix-socket',
 };
 
 const ACTION_LABELS = {
@@ -43,7 +43,9 @@ function render(status) {
   elements.dot.style.background = state === 'connected' ? '#188038' : state === 'working' ? '#1a73e8' : state === 'error' ? '#d93025' : '#f9ab00';
   elements.state.textContent = stateLabel(state);
   elements.detail.textContent = next.detail;
-  elements.url.textContent = next.bridgeUrl;
+  elements.url.textContent = next.socketPath
+    ? `Native Messaging + ${next.socketPath}`
+    : 'Native Messaging + 本地 Unix Socket';
   elements.updated.textContent = next.updatedAt ? new Date(next.updatedAt).toLocaleTimeString() : '';
 
   if (next.action) {

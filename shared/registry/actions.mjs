@@ -9,7 +9,7 @@ export const MANIFEST_PERMISSIONS = [
   'debugger',
   'downloads',
   'history',
-  'offscreen',
+  'nativeMessaging',
   'scripting',
   'storage',
   'tabGroups',

@@ -33,8 +33,6 @@ const stableEntrypoints = [
   'extension/background.js',
   'extension/ask.html',
   'extension/ask.js',
-  'extension/offscreen.html',
-  'extension/offscreen.js',
 ];
 
 for (const entrypoint of stableEntrypoints) {

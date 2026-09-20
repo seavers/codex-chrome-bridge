@@ -35,7 +35,6 @@ async function checkSourceSurface() {
     browserDataText,
     bridgeServerText,
     runTabsText,
-    offscreenText,
     askText,
   ] = await Promise.all([
     readProjectFile('package.json'),
@@ -45,7 +44,6 @@ async function checkSourceSurface() {
     readProjectFile('extension/browser-data.js'),
     readProjectFile('server/bridge-server.mjs'),
     readProjectFile('shared/run-tabs.mjs'),
-    readProjectFile('extension/offscreen.js'),
     readProjectFile('extension/ask.js'),
   ]);
   const packageJson = JSON.parse(packageText);
@@ -81,10 +79,6 @@ async function checkSourceSurface() {
   check(runTabsText.includes("from './safe-record.mjs'"), 'run-tabs must import safe record helper');
   check(runTabsText.includes('stripUnsafeObjectKeys(meta'), 'run-tabs must sanitize persisted tab metadata');
   check(runTabsText.includes('.corrupt.') && runTabsText.includes('parseError'), 'run-tabs must quarantine malformed JSON state files');
-
-  check(!offscreenText.includes("addEventListener('open', async"), 'offscreen open listener must not be an async event listener');
-  check(!offscreenText.includes("addEventListener('message', async"), 'offscreen message listener must not be an async event listener');
-  check(offscreenText.includes('safeSocketSend') && offscreenText.includes('handleSocketMessage'), 'offscreen must route async work through rejection-safe helpers');
 
   check(askText.includes('function requiredElement'), 'ask prompt page must define requiredElement');
   check(askText.includes("requiredElement('#question')"), 'ask prompt page must use requiredElement for required controls');

@@ -89,7 +89,6 @@ check(manifestJson.version === packageJson.version, 'extension manifest and pack
 check(JSON.stringify(archiveFiles) === JSON.stringify(repoFiles), 'extension zip must contain exactly the tracked extension files');
 check(archiveFiles.includes('manifest.json'), 'extension zip must include manifest.json');
 check(archiveFiles.includes('background.js'), 'extension zip must include background.js');
-check(archiveFiles.includes('offscreen.html'), 'extension zip must include offscreen.html');
 check(!archiveFiles.some((entry) => entry.startsWith('extension/')), 'extension zip must package files at the archive root');
 check(!archiveFiles.some((entry) => entry.includes('node_modules')), 'extension zip must not include node_modules');
 check(packageJson.scripts?.['extension:zip'] === 'node ./scripts/package/build-extension-zip.mjs', 'package scripts must expose extension:zip');

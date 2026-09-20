@@ -9,7 +9,7 @@ description: "连接本机已登录的 Google Chrome，读取和操作标签页�
 
 ```text
 Codex Skill / CLI / MCP
-  -> /tmp/codex-chrome-bridge.sock
+  -> per-user Unix Socket reported by the Native Messaging Host
   -> Chrome Native Messaging Host
   -> Chrome Extension
   -> Google Chrome
@@ -85,3 +85,11 @@ node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" text --max-chars 60000
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" screenshot --out /tmp/chrome-bridge.png
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" diagnostics --out /tmp/chrome-bridge-diagnostics.json
 ```
+
+## 验证与恢复
+
+先运行 `runtime-smoke --coverage-plan`，再进行在线验证。发布前至少执行 `npm run check:mcp-runtime-smoke`、`npm run check:tab-group-persistence` 和 `npm run check:privacy`。
+
+升级扩展后，按顺序执行 `reload-extension --confirm`、`doctor --live-checks`，再运行在线 runtime smoke。成功条件是 `verification.status: "passed"`。失败时读取 `verification.nextCommand`、`verification.nextAction`，同时查看 top-level `nextCommand` / `nextAction`。
+
+`check:roadmap` 的延迟在线闸门通过 `deferredLiveVerification` 表示；最终完成标记是 `finalVerificationComplete`。
