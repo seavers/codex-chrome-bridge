@@ -11,6 +11,7 @@
     "debugger",
     "downloads",
     "history",
+    "nativeMessaging",
     "offscreen",
     "scripting",
     "storage",
