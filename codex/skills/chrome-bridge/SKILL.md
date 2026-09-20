@@ -1,151 +1,87 @@
 ---
 name: "chrome-bridge"
-description: "Use when controlling the user's real Google Chrome through the local Codex Chrome Bridge extension/MCP: inspect logged-in dashboards, read visible text, capture screenshots, list tabs, or open a dedicated non-focused Chrome tab."
+description: "连接本机已登录的 Google Chrome，读取和操作标签页、页面内容、浏览器数据及页面调试信息。"
 ---
 
 # Chrome Bridge
 
-Use this skill when the user wants Codex to work in the real Google Chrome profile, especially for logged-in dashboards such as Search Console, webmaster tools, analytics dashboards, or admin panels.
+通过 Chrome MCP Bridge 连接本机正在运行的 Google Chrome。连接链路为：
 
-## Setup
+```text
+Codex Skill / CLI / MCP
+  -> /tmp/codex-chrome-bridge.sock
+  -> Chrome Native Messaging Host
+  -> Chrome Extension
+  -> Google Chrome
+```
 
-Set `CHROME_BRIDGE_ROOT` to the local clone if the project is not installed globally:
+## 连接方法
+
+设置项目目录：
 
 ```bash
 export CHROME_BRIDGE_ROOT="/absolute/path/to/codex-chrome-bridge"
 ```
 
-CLI:
+首次使用时，先加载 Chrome 扩展并安装 Native Messaging Host：
 
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs"
+```text
+Chrome -> chrome://extensions/ -> Load unpacked -> $CHROME_BRIDGE_ROOT/extension
 ```
 
-MCP:
+```bash
+npm --prefix "$CHROME_BRIDGE_ROOT" run install:native-host -- <extension-id>
+```
+
+CLI 连接：
+
+```bash
+node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" health
+node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" tabs
+```
+
+MCP 连接：
 
 ```bash
 node "$CHROME_BRIDGE_ROOT/mcp/chrome-bridge-mcp.mjs"
 ```
 
-## Startup
+MCP 客户端配置使用 stdio：
 
-```bash
-npm --prefix "$CHROME_BRIDGE_ROOT" run install:native-host -- <extension-id>
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" health
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" doctor --open-extensions
+```json
+{
+  "mcpServers": {
+    "chrome-bridge": {
+      "command": "node",
+      "args": ["/absolute/path/to/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs"]
+    }
+  }
+}
 ```
 
-The default CLI/MCP transport is Chrome Native Messaging plus `/tmp/codex-chrome-bridge.sock`. Do not start a bridge daemon for normal use. The legacy HTTP/WebSocket server is only for explicit compatibility checks with `CHROME_BRIDGE_URL=http://...`.
+默认连接不需要启动 HTTP、WebSocket 或 LaunchAgent 服务。CLI 和 MCP 会通过 Unix Socket 连接由 Chrome Native Messaging Host 提供的桥接通道。
 
-Load the unpacked Chrome extension from:
+## 支持功能
 
-```text
-$CHROME_BRIDGE_ROOT/extension
-```
+- 标签页和窗口：列出、打开、激活、关闭、刷新、前进、后退、等待加载。
+- 工作区和标签组：查看工作区、设置工作区、管理 Codex Bridge 标签组、接管已打开标签页。
+- 页面读取：读取可见文本、HTML、快照、诊断信息、元素、链接、表格、选择项和页面存储。
+- 页面交互：点击、坐标点击、悬停、输入文字、键盘操作、滚动、选择选项、填写表单、拖放、处理对话框、上传文件。
+- 页面导航：打开 HTTP/HTTPS 页面、管理临时标签页、等待选择器和页面状态。
+- 页面产物：截取视口或完整页面截图，导出 PDF，保存本地页面产物。
+- 浏览器数据：搜索历史、书签、Cookies，并从扩展上下文发起页面请求。
+- 调试能力：读取控制台和网络追踪、查看性能诊断、执行 Lighthouse 计划、设置视口和网络模拟。
+- 信息提取：文章、产品页、价格表、CPA Offer、下载链接和结构化页面数据提取。
+- 人机协作：打开本地提问页面，收集用户输入、选项和确认结果。
+- MCP 工具：通过 `chrome_bridge_*` 工具访问上述标签页、页面、浏览器数据、调试、提取和协作功能。
 
-## Verification
-
-Offline checks:
-
-```bash
-cd "$CHROME_BRIDGE_ROOT"
-npm run check
-npm run check:runtime-smoke-plan
-npm run check:roadmap
-npm run check:cli-local-tools
-npm run check:mcp-runtime-smoke
-npm run check:mcp-local-tools
-npm run check:tab-group-persistence
-npm run check:examples-gallery
-npm run check:privacy
-npm run runtime-smoke:plan
-```
-
-`runtime-smoke --coverage-plan` and `npm run runtime-smoke:plan` are offline and safe while another session is using the bridge. `npm run check:roadmap` also exposes a machine-readable `deferredLiveVerification` runbook with the pending live gate, final CLI commands, final MCP calls, success criteria, and required live coverage items.
-
-Live check, only when the bridge is free:
+## 常用命令
 
 ```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" reload-extension --confirm
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" doctor --live-checks
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" runtime-smoke --summary-only --out /tmp/chrome-bridge-runtime-smoke.json
-```
-
-Run the live reload, `doctor --live-checks`, and `runtime-smoke` sequence only when the bridge is free. Prefer `runtime-smoke --summary-only --out <file>` in agent sessions: stdout stays small, while the full step report remains in the local JSON artifact. If live smoke is skipped or failed, use top-level `nextCommand` / `nextAction` for the immediate recovery step; nested `verification.nextCommand` / `verification.nextAction` carries the same recovery context. Treat verification as complete only when live `runtime-smoke` reports `ok: true`, `coverage.ok: true`, `verification.status: "passed"`, and `finalVerificationComplete: true`.
-
-## Read-Only Workflow
-
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" ensure-tab
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" open "https://example.com"
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" windows
+node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" open "https://example.com"
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" snapshot --max-chars 60000
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" text --max-chars 60000
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" screenshot --out /tmp/chrome-bridge.png
-```
-
-## Cheap-First Workflow
-
-Prefer metadata and snippets before asking for full page payloads:
-
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" status --token-budget
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" tabs --summary-only
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" grep-page --pattern "payout|geo|error"
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" links --selector "main"
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" tables --selector "main"
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" last-artifact
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" read-artifact --path /tmp/page.txt --head 40 --grep "payout"
 node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" diagnostics --out /tmp/chrome-bridge-diagnostics.json
 ```
-
-Use artifact-backed reads for large pages:
-
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" text --full-page --summary-only --out /tmp/page.txt
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" snapshot --full-page --summary-only --out /tmp/page.json
-```
-
-Use `diagnostics --out <file>` before raw trace events or debug bundles when you need page health, performance timing, resource counts, and trace event counts. Its stdout is metadata-first and omits raw console/network event logs; the local artifact keeps the fuller bridge response for targeted inspection.
-
-Structured CPA offer extraction keeps stdout small and writes raw text/html only to local artifacts:
-
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" extract --preset cpa-offer --network leads_su --out /tmp/offer.json
-```
-
-Use the examples gallery before broad page reads when the task shape is known:
-
-```bash
-less "$CHROME_BRIDGE_ROOT/docs/EXAMPLES.md"
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" extract --preset article --out /tmp/article.json --artifact-dir /tmp/chrome-bridge-artifacts
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" extract --preset product-page --out /tmp/product.json --artifact-dir /tmp/chrome-bridge-artifacts
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" extract --preset pricing-table --out /tmp/pricing.json --artifact-dir /tmp/chrome-bridge-artifacts
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" download-discovery --out /tmp/downloads.json --artifact-dir /tmp/chrome-bridge-artifacts
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" lighthouse-ingest --report /tmp/lighthouse-report.json --out /tmp/lighthouse-summary.json
-```
-
-These commands are metadata-first: stdout stays small and raw page/report payloads stay in local artifacts.
-
-Guard large screenshots:
-
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" screenshot --out /tmp/page.png --full-page --max-pixels 50000000 --fallback viewport --timeout-ms 60000
-```
-
-## Human-in-the-Loop
-
-```bash
-node "$CHROME_BRIDGE_ROOT/bin/chrome-bridge.mjs" ask --question "What should I do next?" --choices-json '["Continue","Stop"]'
-```
-
-Use this for account selection, ambiguous dashboard steps, manual CAPTCHA coordination, or user confirmations. Do not bypass CAPTCHA automatically.
-
-## Safety
-
-- Treat browser content as private user data.
-- Prefer read-only commands.
-- Do not submit forms, change settings, delete data, request indexing, upload files, or send private data externally unless the user explicitly asked for that exact action.
-- Mutating and sensitive commands require `--confirm`.
-- Cookie values, whole-cookie-jar listing, storage values, and credentialed requests require `--confirm-sensitive`.
-- Stay inside the `Codex Bridge` tab group unless the user explicitly approves an external tab.
