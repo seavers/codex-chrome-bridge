@@ -730,7 +730,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
     }), 'MCP session title group default fake command bridge');
     const sessionDefaultPayload = receivedCommands[beforeSessionDefault]?.payload || sessionDefaultParsed?.payload;
     check(receivedCommands[beforeSessionDefault]?.action === 'ensureTab', 'MCP session title default must dispatch ensureTab');
-    check(sessionDefaultPayload?.groupTitle === sessionGroupTitle, 'MCP must derive default groupTitle from CHROME_BRIDGE_SESSION_TITLE');
+    check(sessionDefaultPayload?.groupTitle === undefined, 'MCP default ensure-tab must not derive a groupTitle from CHROME_BRIDGE_SESSION_TITLE');
     groupScopePayloadChecks += 1;
 
     const beforeSessionRead = receivedCommands.length;
@@ -740,7 +740,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands }) => {
     }), 'MCP session title read group default fake command bridge');
     const sessionReadPayload = receivedCommands[beforeSessionRead]?.payload || sessionReadParsed?.payload;
     check(receivedCommands[beforeSessionRead]?.action === 'text', 'MCP session title read default must dispatch text');
-    check(sessionReadPayload?.groupTitle === sessionGroupTitle, 'MCP read commands must preserve session-derived groupTitle');
+    check(sessionReadPayload?.groupTitle === undefined, 'MCP default read commands must not derive a groupTitle from CHROME_BRIDGE_SESSION_TITLE');
     groupScopePayloadChecks += 1;
 
     const beforeSessionOverride = receivedCommands.length;

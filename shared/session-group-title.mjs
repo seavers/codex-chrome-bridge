@@ -47,6 +47,9 @@ export function withSessionGroupTitle(action, payload = {}, env = process.env) {
     return payload;
   }
 
+  const groupOnlyActions = new Set(['group', 'workspace', 'setWorkspace', 'clearWorkspace', 'adoptTab', 'closeGroup']);
+  if (!groupOnlyActions.has(action) && !['scoped', 'strict'].includes(payload.policyMode)) return payload;
+
   const groupTitle = sessionGroupTitleFromEnv(env);
   return groupTitle ? { ...payload, groupTitle } : payload;
 }

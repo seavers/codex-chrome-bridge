@@ -3,7 +3,7 @@ import { withUserFocusPreserved } from './focus-context.js';
 import { groupInfo, tabInfo } from './tab-info.js';
 import { waitForTabComplete } from './tab-loading.js';
 import { requireConfirmed } from './safety-gates.js';
-import { groupOptions } from './workspace-policy.js';
+import { groupOptions, isGroupScoped } from './workspace-policy.js';
 import {
   chromeId,
   ensureCodexGroupForTab,
@@ -38,7 +38,7 @@ export async function listTabs(payload = {}) {
   const options = await groupOptions(payload);
   const codexGroups = groups.filter((group) => group.title === options.title);
   const codexGroupIds = new Set(codexGroups.map((group) => group.id));
-  const scoped = !payload.includeAll;
+  const scoped = payload.includeAll === false;
   const visibleTabs = scoped
     ? tabs.filter((tab) => codexGroupIds.has(tab.groupId))
     : tabs;
@@ -59,7 +59,7 @@ export async function listWindows(payload = {}) {
   });
   const groups = await listTabGroups();
   const options = await groupOptions(payload);
-  const scoped = !payload.includeAll;
+  const scoped = payload.includeAll === false;
 
   const windowInfos = windows.map((window) => {
     const windowGroups = groups.filter((group) => group.windowId === window.id);
@@ -147,6 +147,17 @@ export async function openTab(payload) {
 }
 
 async function createGroupedTab(payload) {
+  if (!(await isGroupScoped(payload))) {
+    const tab = await chrome.tabs.create({
+      url: payload.url,
+      active: Boolean(payload.active),
+    });
+    if (chromeId(tab?.id) === null) throw new Error('Failed to create a Chrome tab');
+    const loaded = await waitForTabComplete(tab.id);
+    await storageSet({ codexTabId: loaded.id, codexWindowId: loaded.windowId });
+    return tabInfo(loaded);
+  }
+
   const options = await groupOptions(payload);
   let tabs = await getCodexGroupTabs(payload);
   let tab;

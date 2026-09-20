@@ -22,17 +22,17 @@ The command metadata table below is generated from the shared registry by `npm r
 | `server` | `server` | system | - | no | no | Start the local Chrome Bridge HTTP/WebSocket server. |
 | `health` | `health` | read | 10000 ms | no | yes | Read local bridge health and extension connection status. |
 | `status` | `status` | read | 30000 ms | no | yes | Print cheap-first bridge status and token-budget recommendations. |
-| `windows` | `windows` | read | 10000 ms | conditional | yes | List Chrome windows, scoped to the configured bridge group by default; includeAll requires confirmation. |
+| `windows` | `windows` | read | 10000 ms | conditional | yes | List all Chrome windows by default; pass includeAll=false with an explicit group to limit the result. |
 | `group` | `group` | read | 10000 ms | no | yes | Show the current scoped Chrome tab group and its tabs. |
-| `tabs` | `tabs` | read | 10000 ms | conditional | yes | List Chrome tabs, scoped to the configured bridge group by default; includeAll requires confirmation. |
-| `workspace` | `workspace` | read | 10000 ms | no | yes | Show local workspace defaults, policy mode, and scoped group counts. |
-| `set-workspace` | `setWorkspace` | system | 10000 ms | yes | yes | Set local workspace group title, color, and scoped/strict policy defaults. |
-| `clear-workspace` | `clearWorkspace` | system | 10000 ms | yes | yes | Clear local workspace defaults and return to the default group policy. |
-| `ensure-tab` | `ensureTab` | system | 30000 ms | no | yes | Create or recover the dedicated scoped Chrome work tab. |
-| `adopt-tab` | `adoptTab` | interaction | 30000 ms | yes | yes | Adopt an already-open Chrome tab into the scoped bridge group. |
-| `open` | `open` | interaction | 30000 ms | no | yes | Open a URL in the scoped bridge tab or a new grouped tab. |
-| `activate` | `activateTab` | interaction | 10000 ms | no | yes | Activate a scoped tab and optionally focus its window. |
-| `close-tab` | `closeTab` | interaction | 10000 ms | yes | yes | Close one scoped tab. |
+| `tabs` | `tabs` | read | 10000 ms | conditional | yes | List all Chrome tabs by default; pass includeAll=false with an explicit group to limit the result. |
+| `workspace` | `workspace` | read | 10000 ms | no | yes | Show local workspace defaults, policy mode, and group counts. |
+| `set-workspace` | `setWorkspace` | system | 10000 ms | yes | yes | Set local workspace group title, color, and open/scoped/strict policy defaults. |
+| `clear-workspace` | `clearWorkspace` | system | 10000 ms | yes | yes | Clear local workspace defaults and return to the default open policy. |
+| `ensure-tab` | `ensureTab` | system | 30000 ms | no | yes | Create or recover the active Chrome work tab; explicit scoped policies still use a dedicated group. |
+| `adopt-tab` | `adoptTab` | interaction | 30000 ms | yes | yes | Adopt an already-open Chrome tab into an explicit scoped bridge group. |
+| `open` | `open` | interaction | 30000 ms | no | yes | Open a URL in the active Chrome tab or a new tab; explicit scoped policies use the bridge group. |
+| `activate` | `activateTab` | interaction | 10000 ms | no | yes | Activate any Chrome tab and optionally focus its window. |
+| `close-tab` | `closeTab` | interaction | 10000 ms | yes | yes | Close one Chrome tab. |
 | `close-group` | `closeGroup` | interaction | 10000 ms | yes | yes | Close all tabs in the scoped bridge group. |
 | `back` | `goBack` | interaction | 30000 ms | no | yes | Navigate the selected tab backward. |
 | `forward` | `goForward` | interaction | 30000 ms | no | yes | Navigate the selected tab forward. |
@@ -147,7 +147,7 @@ chrome-bridge runtime-smoke [--keep-tab] [--coverage-plan] [--summary-only] [--o
 chrome-bridge group [--tabs] [--group-title <title>] [--group-color <color>]
 chrome-bridge tabs [--json --summary-only] [--all --confirm] [--group-title <title>] [--group-color <color>]
 chrome-bridge workspace [--tabs]
-chrome-bridge set-workspace [--name <name>] [--group-title <title>] [--group-color <color>] [--policy-mode scoped|strict] --confirm
+chrome-bridge set-workspace [--name <name>] [--group-title <title>] [--group-color <color>] [--policy-mode open|scoped|strict] --confirm
 chrome-bridge clear-workspace --confirm
 chrome-bridge ensure-tab [url] [--active] [--group-title <title>] [--group-color <color>]
 chrome-bridge adopt-tab [--tab <id>] [--group-title <title>] [--group-color <color>] --confirm
@@ -163,11 +163,11 @@ chrome-bridge reload [--tab <id>] [--bypass-cache] [--allow-external]
 ```
 <!-- END GENERATED CLI USAGE: tabs-navigation -->
 
-By default, tab operations stay inside the configured workspace tab group, initially `Codex Bridge`. When the CLI runs inside a Codex session, it derives a per-session default group title from `CHROME_BRIDGE_SESSION_TITLE`, `CODEX_SESSION_TITLE`, `CODEX_THREAD_TITLE`, or a short `CODEX_THREAD_ID`, for example `Codex Bridge - Kurerok Research`. Pass `--group-title` to override this automatic session scope.
+By default, tab operations can target all Chrome tabs. Explicit `--group-title` or `--policy-mode scoped|strict` restores workspace grouping; session titles are only used for explicit group-oriented commands.
 
 If the extension is enabled in multiple Chrome profiles, `chrome-bridge health` includes `extensions[]` entries for each connected profile. Set `CHROME_BRIDGE_PROFILE_ID` to the target `extensions[].info.profileId` or `extensions[].info.clientId` before running commands from a given shell. When multiple profiles are connected and no target is configured, direct commands fail with `AMBIGUOUS_EXTENSION_PROFILE` rather than controlling a random profile.
 
-`workspace` reports the local workspace defaults, policy mode, group counts, and optionally scoped tabs. `set-workspace` stores local defaults for the group title/color and explicit policy mode. It requires `--confirm`. `scoped` keeps outside tabs explicit-only through `--allow-external`; `strict` blocks outside tabs even when `--allow-external` is passed.
+`workspace` reports the local workspace defaults, policy mode, group counts, and optionally grouped tabs. `set-workspace` stores local defaults for the group title/color and explicit policy mode. It requires `--confirm`. `open` allows all tabs by default, `scoped` keeps outside tabs explicit-only through `--allow-external`, and `strict` blocks outside tabs even when `--allow-external` is passed.
 
 `close-tab` and `close-group` first try to mark scoped groups unsaved when the running Chrome exposes that API, then remove scoped tabs from their Chrome tab group before closing them. This helps prevent Chrome from leaving new saved closed `Codex Bridge` group chips under the URL bar after bridge cleanup. If Chrome cannot ungroup a grouped bridge tab, the close command fails closed instead of closing it in-place.
 

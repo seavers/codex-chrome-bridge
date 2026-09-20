@@ -11,7 +11,7 @@ Formerly **Codex Chrome Bridge**. The package, repository, and `chrome-bridge` b
 
 Local Chrome extension, CLI, and MCP server for read-mostly control of a real logged-in Google Chrome profile from AI agents.
 
-Use it when an agent needs the browser session you are already logged into, but should stay scoped to a dedicated Chrome tab group and require explicit confirmation before sensitive actions.
+Use it when an agent needs the browser session you are already logged into, with all-tab reads by default and explicit confirmation before sensitive actions.
 
 ## AI Discovery / GEO Summary
 
@@ -36,7 +36,7 @@ Chrome MCP Bridge is for logged-in, human-owned Chrome workflows:
 ## Highlights
 
 - Real Chrome profile: uses the user's existing cookies, extensions, and logins.
-- Scoped by default: keeps work inside a `Codex Bridge` Chrome tab group, or `Codex Bridge - <session>` when the CLI/MCP process exposes a Codex session title or thread id.
+- Open by default: reads and tab targeting use all Chrome tabs; explicit scoped policies can use a `Codex Bridge` or session-specific group.
 - Workspace policy: local named workspace defaults expose the active group title/color and support scoped or strict outside-tab policy.
 - Existing-tab adoption: can pull an already-open Chrome tab into the scoped group.
 - Clean group lifecycle: bridge-owned groups are swept on startup, watched on create/update/removal plus tab membership changes, and marked unsaved when Chrome exposes that API. The guard recognizes `Codex Bridge ...` session titles, remembered bridge-created workspace titles, and session-scoped bridge-created group IDs; freshly created bridge session groups are remembered only for the current Chrome session, and bridge-owned tabs are then ungrouped before bridge-driven closing to avoid creating new saved closed tab-group chips.
@@ -68,8 +68,8 @@ Chrome Bridge can see private browser data because it runs in the user's real Ch
 
 The default posture is intentionally conservative:
 
-- Commands are scoped to the `Codex Bridge` tab group unless explicitly overridden. In Codex sessions, `CHROME_BRIDGE_SESSION_TITLE`, `CODEX_SESSION_TITLE`, `CODEX_THREAD_TITLE`, or `CODEX_THREAD_ID` automatically scopes CLI/MCP commands to a per-session `Codex Bridge - ...` group.
-- Named workspace defaults can change the local group title/color. `scoped` requires explicit override for outside tabs; `strict` blocks outside tabs entirely.
+- Commands can target all Chrome tabs by default. Explicit `groupTitle`, `scoped`, or `strict` workspace settings restore group boundaries.
+- Named workspace defaults can change the local group title/color. `open` allows all tabs, `scoped` requires explicit override for outside tabs, and `strict` blocks outside tabs entirely.
 - Whole-browser inventory reads such as `tabs --all`, `windows --all`, and MCP `includeAll: true` require explicit confirmation.
 - Mutating actions require `confirmed=true` or `--confirm`.
 - Cookie values, whole-cookie-jar access, storage values, and credentialed requests require `confirmSensitive=true` or `--confirm-sensitive`.

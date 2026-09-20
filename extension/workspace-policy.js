@@ -1,9 +1,9 @@
 const DEFAULT_WORKSPACE_NAME = 'default';
 export const DEFAULT_GROUP_TITLE = 'Codex Bridge';
 const DEFAULT_GROUP_COLOR = 'purple';
-const DEFAULT_POLICY_MODE = 'scoped';
+const DEFAULT_POLICY_MODE = 'open';
 const ALLOWED_GROUP_COLORS = new Set(['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange']);
-const ALLOWED_POLICY_MODES = new Set(['scoped', 'strict']);
+const ALLOWED_POLICY_MODES = new Set(['open', 'scoped', 'strict']);
 
 function normalizeString(value, fallback) {
   const normalized = String(value || '').trim();
@@ -37,6 +37,14 @@ export async function groupOptions(payload = {}) {
     title: normalizeString(payload.groupTitle || stored.codexWorkspaceGroupTitle, DEFAULT_GROUP_TITLE),
     color: normalizeGroupColor(payload.groupColor || stored.codexWorkspaceGroupColor),
     policyMode: normalizePolicyMode(payload.policyMode || stored.codexWorkspacePolicyMode),
-    externalTabs: normalizePolicyMode(payload.policyMode || stored.codexWorkspacePolicyMode) === 'strict' ? 'blocked' : 'explicit-only',
+    externalTabs: normalizePolicyMode(payload.policyMode || stored.codexWorkspacePolicyMode) === 'strict'
+      ? 'blocked'
+      : normalizePolicyMode(payload.policyMode || stored.codexWorkspacePolicyMode) === 'scoped' ? 'explicit-only' : 'all',
   };
+}
+
+export async function isGroupScoped(payload = {}) {
+  const stored = await storageGet(['codexWorkspacePolicyMode']).catch(() => ({}));
+  const policyMode = normalizePolicyMode(payload.policyMode || payload.codexWorkspacePolicyMode || stored.codexWorkspacePolicyMode);
+  return policyMode !== 'open' || payload.groupTitle !== undefined || payload.groupColor !== undefined;
 }

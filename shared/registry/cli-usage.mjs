@@ -5,7 +5,7 @@ export const CLI_USAGE_LINES = Object.freeze([
   'chrome-bridge group [--tabs] [--group-title <title>] [--group-color <color>]',
   'chrome-bridge tabs [--json --summary-only] [--all --confirm] [--group-title <title>] [--group-color <color>]',
   'chrome-bridge workspace [--tabs]',
-  'chrome-bridge set-workspace [--name <name>] [--group-title <title>] [--group-color <color>] [--policy-mode scoped|strict] --confirm',
+  'chrome-bridge set-workspace [--name <name>] [--group-title <title>] [--group-color <color>] [--policy-mode open|scoped|strict] --confirm',
   'chrome-bridge clear-workspace --confirm',
   'chrome-bridge ensure-tab [url] [--active] [--group-title <title>] [--group-color <color>]',
   'chrome-bridge adopt-tab [--tab <id>] [--group-title <title>] [--group-color <color>] --confirm',

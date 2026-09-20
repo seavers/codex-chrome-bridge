@@ -1008,7 +1008,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   const sessionDefaultParsed = parseJsonOutput(sessionDefaultResult, 'CLI session title group default fake command bridge');
   const sessionDefaultPayload = receivedCommands[beforeSessionDefault]?.payload || sessionDefaultParsed?.payload;
   check(receivedCommands[beforeSessionDefault]?.action === 'ensureTab', 'CLI session title default must dispatch ensureTab');
-  check(sessionDefaultPayload?.groupTitle === sessionGroupTitle, 'CLI must derive default groupTitle from CHROME_BRIDGE_SESSION_TITLE');
+  check(sessionDefaultPayload?.groupTitle === undefined, 'CLI default ensure-tab must not derive a groupTitle from CHROME_BRIDGE_SESSION_TITLE');
   groupScopePayloadChecks += 1;
 
   const beforeSessionRead = receivedCommands.length;
@@ -1020,7 +1020,7 @@ await withFakeCommandBridge(async ({ bridgeUrl, receivedCommands, invalidPayload
   const sessionReadParsed = parseJsonOutput(sessionReadResult, 'CLI session title read group default fake command bridge');
   const sessionReadPayload = receivedCommands[beforeSessionRead]?.payload || sessionReadParsed?.payload;
   check(receivedCommands[beforeSessionRead]?.action === 'text', 'CLI session title read default must dispatch text');
-  check(sessionReadPayload?.groupTitle === sessionGroupTitle, 'CLI read commands must preserve session-derived groupTitle');
+  check(sessionReadPayload?.groupTitle === undefined, 'CLI default read commands must not derive a groupTitle from CHROME_BRIDGE_SESSION_TITLE');
   groupScopePayloadChecks += 1;
 
   const beforeSessionOverride = receivedCommands.length;

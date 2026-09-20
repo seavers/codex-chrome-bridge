@@ -1849,9 +1849,9 @@ async function selfTest() {
     {
       label: 'registry',
       item: 'strict workspace policy mode',
-      ok: workspacePolicy.includes("['scoped', 'strict']")
-        && usage().includes('--policy-mode scoped|strict')
-        && mcp.includes("z.enum(['scoped', 'strict'])")
+      ok: workspacePolicy.includes("['open', 'scoped', 'strict']")
+        && usage().includes('--policy-mode open|scoped|strict')
+        && mcp.includes("z.enum(['open', 'scoped', 'strict'])")
         && workspaceTabs.includes("policyMode === 'strict'"),
     },
     {
@@ -3408,7 +3408,7 @@ export async function main() {
   if (cmd === 'tabs') {
     if (args.all && !args.confirm) throw new Error('tabs --all requires --confirm');
     const result = await command('tabs', {
-      includeAll: Boolean(args.all),
+      includeAll: args.all ? true : undefined,
       ...groupScopePayload(args),
       ...confirmationPayload(args),
     });
@@ -3419,7 +3419,7 @@ export async function main() {
   if (cmd === 'windows') {
     if (args.all && !args.confirm) throw new Error('windows --all requires --confirm');
     printJson(await command('windows', {
-      includeAll: Boolean(args.all),
+      includeAll: args.all ? true : undefined,
       ...groupScopePayload(args),
       ...confirmationPayload(args),
     }));

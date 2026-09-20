@@ -4,7 +4,7 @@ Chrome MCP Bridge can inspect a real Chrome profile. That is powerful and sensit
 
 ## Default Scope
 
-The bridge scopes browser work to a Chrome tab group named `Codex Bridge` by default. CLI and MCP clients automatically switch to a per-session title such as `Codex Bridge - Kurerok Research` when `CHROME_BRIDGE_SESSION_TITLE`, `CODEX_SESSION_TITLE`, `CODEX_THREAD_TITLE`, or `CODEX_THREAD_ID` is present; explicit `groupTitle`/`--group-title` still wins.
+The bridge allows all Chrome tabs by default. Explicit `groupTitle`/`--group-title`, `scoped`, or `strict` workspace policy restores a Chrome tab-group boundary.
 
 Users can configure local workspace defaults for the group title/color with `set-workspace` or `chrome_bridge_set_workspace`. This does not grant broader browser access.
 
@@ -12,14 +12,15 @@ When the extension service worker starts, and whenever the bridge creates, reuse
 
 When the bridge closes its own tabs through `close-tab`, `close-group`, prompt cleanup, or `runtime-smoke` cleanup, the extension first tries the same best-effort saved-group disablement, then removes those tabs from their Chrome tab group, and only then closes them. Cleanup returns `savedClosedGroupChipPrevention` metadata when this ungroup-before-close path runs. If Chrome cannot ungroup a grouped bridge tab, cleanup fails closed instead of closing the tab and risking a new saved closed group chip. This prevents future bridge cleanup from creating more saved closed groups but cannot delete groups Chrome has already saved.
 
-Whole-browser inventory reads require explicit approval: `tabs --all`, `windows --all`, `chrome_bridge_tabs({ includeAll: true })`, and `chrome_bridge_windows({ includeAll: true })` must include confirmation because they can expose unrelated tab URLs and titles.
+Whole-browser inventory reads are the default. Explicit `tabs --all`, `windows --all`, `chrome_bridge_tabs({ includeAll: true })`, and `chrome_bridge_windows({ includeAll: true })` remain confirmation-gated because they can expose unrelated tab URLs and titles.
 
 Policy modes:
 
+- `open`: commands can target all Chrome tabs by default.
 - `scoped`: commands with explicit tab IDs reject outside tabs unless `allowExternal` or `--allow-external` is passed.
 - `strict`: outside tabs are blocked even when `allowExternal` or `--allow-external` is passed.
 
-Commands with explicit tab IDs reject outside tabs by default; `allowExternal` is only honored in `scoped` policy mode.
+Commands with explicit tab IDs are open by default; `allowExternal` remains available for scoped compatibility and is blocked by strict policy.
 
 ## MCP Tool Profiles
 

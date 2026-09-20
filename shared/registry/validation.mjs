@@ -222,7 +222,7 @@ export function validateCommandPayload(action, payload = {}) {
   ensureRecordValues(normalizedPayload, 'fields', action, ['string', 'number', 'boolean']);
   ensureRecordValues(normalizedPayload, 'headers', action, ['string']);
   ensureEnum(normalizedPayload, 'groupColor', action, TAB_GROUP_COLORS);
-  ensureEnum(normalizedPayload, 'policyMode', action, ['scoped', 'strict']);
+  ensureEnum(normalizedPayload, 'policyMode', action, ['open', 'scoped', 'strict']);
   ensureEnum(normalizedPayload, 'kind', action, ['all', 'tables', 'forms', 'lists', 'keyValues']);
   ensureEnum(normalizedPayload, 'fallback', action, ['viewport', 'error']);
   ensureEnum(normalizedPayload, 'credentials', action, ['omit', 'include']);

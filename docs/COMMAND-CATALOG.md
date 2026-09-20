@@ -4,17 +4,17 @@ Version: 0.4.1
 
 | Action | Category | Risk | Default Timeout | CLI | MCP | Confirm | Direct Payload Keys | Summary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| windows | scope | read | 10000 ms | windows | chrome_bridge_windows | conditional | includeAll, groupTitle, groupColor, confirmed | List Chrome windows, scoped to the configured bridge group by default; includeAll requires confirmation. |
-| tabs | scope | read | 10000 ms | tabs | chrome_bridge_tabs | conditional | includeAll, groupTitle, groupColor, confirmed | List Chrome tabs, scoped to the configured bridge group by default; includeAll requires confirmation. |
+| windows | scope | read | 10000 ms | windows | chrome_bridge_windows | conditional | includeAll, groupTitle, groupColor, confirmed | List all Chrome windows by default; pass includeAll=false with an explicit group to limit the result. |
+| tabs | scope | read | 10000 ms | tabs | chrome_bridge_tabs | conditional | includeAll, groupTitle, groupColor, confirmed | List all Chrome tabs by default; pass includeAll=false with an explicit group to limit the result. |
 | group | scope | read | 10000 ms | group | chrome_bridge_group | no | includeTabs, groupTitle, groupColor | Show the current scoped Chrome tab group and its tabs. |
-| workspace | scope | read | 10000 ms | workspace | chrome_bridge_workspace | no | includeTabs | Show local workspace defaults, policy mode, and scoped group counts. |
-| setWorkspace | scope | system | 10000 ms | set-workspace | chrome_bridge_set_workspace | yes | name, groupTitle, groupColor, policyMode, confirmed | Set local workspace group title, color, and scoped/strict policy defaults. |
-| clearWorkspace | scope | system | 10000 ms | clear-workspace | chrome_bridge_clear_workspace | yes | confirmed | Clear local workspace defaults and return to the default group policy. |
-| ensureTab | navigation | system | 30000 ms | ensure-tab | chrome_bridge_ensure_tab | no | url, active, groupTitle, groupColor | Create or recover the dedicated scoped Chrome work tab. |
-| adoptTab | navigation | interaction | 30000 ms | adopt-tab | chrome_bridge_adopt_tab | yes | tabId, confirmed, groupTitle, groupColor | Adopt an already-open Chrome tab into the scoped bridge group. |
-| open | navigation | interaction | 30000 ms | open | chrome_bridge_open | no | tabId, allowExternal, groupTitle, groupColor, url, active, newTab | Open a URL in the scoped bridge tab or a new grouped tab. |
-| activateTab | navigation | interaction | 10000 ms | activate | chrome_bridge_activate_tab | no | tabId, allowExternal, groupTitle, groupColor, focusWindow | Activate a scoped tab and optionally focus its window. |
-| closeTab | navigation | interaction | 10000 ms | close-tab | chrome_bridge_close_tab | yes | tabId, allowExternal, groupTitle, groupColor, confirmed | Close one scoped tab. |
+| workspace | scope | read | 10000 ms | workspace | chrome_bridge_workspace | no | includeTabs | Show local workspace defaults, policy mode, and group counts. |
+| setWorkspace | scope | system | 10000 ms | set-workspace | chrome_bridge_set_workspace | yes | name, groupTitle, groupColor, policyMode, confirmed | Set local workspace group title, color, and open/scoped/strict policy defaults. |
+| clearWorkspace | scope | system | 10000 ms | clear-workspace | chrome_bridge_clear_workspace | yes | confirmed | Clear local workspace defaults and return to the default open policy. |
+| ensureTab | navigation | system | 30000 ms | ensure-tab | chrome_bridge_ensure_tab | no | url, active, groupTitle, groupColor | Create or recover the active Chrome work tab; explicit scoped policies still use a dedicated group. |
+| adoptTab | navigation | interaction | 30000 ms | adopt-tab | chrome_bridge_adopt_tab | yes | tabId, confirmed, groupTitle, groupColor | Adopt an already-open Chrome tab into an explicit scoped bridge group. |
+| open | navigation | interaction | 30000 ms | open | chrome_bridge_open | no | tabId, allowExternal, groupTitle, groupColor, url, active, newTab | Open a URL in the active Chrome tab or a new tab; explicit scoped policies use the bridge group. |
+| activateTab | navigation | interaction | 10000 ms | activate | chrome_bridge_activate_tab | no | tabId, allowExternal, groupTitle, groupColor, focusWindow | Activate any Chrome tab and optionally focus its window. |
+| closeTab | navigation | interaction | 10000 ms | close-tab | chrome_bridge_close_tab | yes | tabId, allowExternal, groupTitle, groupColor, confirmed | Close one Chrome tab. |
 | closeGroup | navigation | interaction | 10000 ms | close-group | chrome_bridge_close_group | yes | confirmed, groupTitle, groupColor | Close all tabs in the scoped bridge group. |
 | goBack | navigation | interaction | 30000 ms | back | chrome_bridge_back | no | tabId, allowExternal, groupTitle, groupColor, timeoutMs | Navigate the selected tab backward. |
 | goForward | navigation | interaction | 30000 ms | forward | chrome_bridge_forward | no | tabId, allowExternal, groupTitle, groupColor, timeoutMs | Navigate the selected tab forward. |
@@ -100,7 +100,7 @@ chrome-bridge windows [--all --confirm] [--group-title <title>] [--group-color <
 chrome-bridge group [--tabs] [--group-title <title>] [--group-color <color>]
 chrome-bridge tabs [--json --summary-only] [--all --confirm] [--group-title <title>] [--group-color <color>]
 chrome-bridge workspace [--tabs]
-chrome-bridge set-workspace [--name <name>] [--group-title <title>] [--group-color <color>] [--policy-mode scoped|strict] --confirm
+chrome-bridge set-workspace [--name <name>] [--group-title <title>] [--group-color <color>] [--policy-mode open|scoped|strict] --confirm
 chrome-bridge clear-workspace --confirm
 chrome-bridge ensure-tab [url] [--active] [--group-title <title>] [--group-color <color>]
 chrome-bridge adopt-tab [--tab <id>] [--group-title <title>] [--group-color <color>] --confirm

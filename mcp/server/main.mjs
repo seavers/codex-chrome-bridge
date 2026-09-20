@@ -724,8 +724,8 @@ function safetyResourceText() {
     '# Chrome MCP Bridge Safety',
     '',
     '- The bridge controls a real logged-in Chrome profile on the local machine.',
-    '- Default scope is the dedicated Chrome Bridge tab group; outside tabs require explicit override or are blocked in strict mode.',
-    '- Inventory reads like `tabs` and `windows` require confirmation when `includeAll: true` is used.',
+    '- Default scope is all Chrome tabs; explicit `scoped` or `strict` workspace policy can restore group boundaries.',
+    '- Inventory reads like `tabs` and `windows` are all-tabs by default; pass `includeAll: false` with a group scope to limit the result.',
     '- Mutating tools require `confirmed: true`.',
     '- Private browser reads such as cookies, storage values, and credentialed requests require `confirmSensitive: true` in addition to `confirmed: true`.',
     '- Large or sensitive outputs should go to local artifacts instead of inline MCP text.',
@@ -1086,7 +1086,7 @@ server.tool(
 
 server.tool(
   'chrome_bridge_windows',
-  'List Chrome windows with grouped tabs. By default this is scoped to windows containing the Codex Bridge tab group; includeAll requires confirmed=true for explicitly approved diagnostics.',
+  'List Chrome windows with grouped tabs. By default this includes all normal Chrome windows; pass includeAll=false with a group scope to limit the result.',
   {
     includeAll: z.boolean().optional(),
     groupTitle: z.string().optional(),
@@ -1098,7 +1098,7 @@ server.tool(
 
 server.tool(
   'chrome_bridge_tabs',
-  'List Chrome tabs. By default this is scoped to the Codex Bridge tab group; includeAll requires confirmed=true for explicitly approved diagnostics.',
+  'List Chrome tabs. By default this includes all Chrome tabs; pass includeAll=false with a group scope to limit the result.',
   {
     includeAll: z.boolean().optional(),
     groupTitle: z.string().optional(),
@@ -1121,7 +1121,7 @@ server.tool(
 
 server.tool(
   'chrome_bridge_workspace',
-  'Show the active Chrome Bridge workspace defaults, policy mode, scoped group counts, and optionally scoped tabs.',
+  'Show the active Chrome Bridge workspace defaults, policy mode, group counts, and optionally grouped tabs.',
   {
     includeTabs: z.boolean().optional(),
   },
@@ -1130,12 +1130,12 @@ server.tool(
 
 server.tool(
   'chrome_bridge_set_workspace',
-  'Set local workspace defaults for group title/color and policy mode. Requires confirmed=true; policyMode supports scoped or strict.',
+  'Set local workspace defaults for group title/color and policy mode. Requires confirmed=true; policyMode supports open, scoped, or strict.',
   {
     name: z.string().optional(),
     groupTitle: z.string().optional(),
     groupColor: z.enum(TAB_GROUP_COLORS).optional(),
-    policyMode: z.enum(['scoped', 'strict']).optional(),
+    policyMode: z.enum(['open', 'scoped', 'strict']).optional(),
     confirmed: z.boolean(),
   },
   async (args) => textResult(await bridgeCommand('setWorkspace', args, 10_000)),
@@ -1191,7 +1191,7 @@ server.tool(
 
 server.tool(
   'chrome_bridge_activate_tab',
-  'Activate a tab in the Codex Bridge group. Pass allowExternal only for explicitly approved outside tabs.',
+  'Activate any Chrome tab. Explicit scoped policies may require allowExternal for outside tabs.',
   {
     tabId: chromeIdSchema.optional(),
     focusWindow: z.boolean().optional(),

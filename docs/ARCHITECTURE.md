@@ -117,4 +117,4 @@ The important boundary is the user's real Chrome profile. Anything visible to Ch
 
 Use [SAFETY.md](SAFETY.md) as the source of truth for confirmation gates and private-data handling.
 
-Named workspace defaults are stored in extension-local storage. They make the active group title/color and policy mode explicit without weakening the default tab boundary: `scoped` requires `allowExternal` for outside tabs, while `strict` blocks outside tabs entirely. CLI/MCP session-derived titles are not persisted as workspace defaults; they are applied to each scoped command payload so separate Codex sessions can use separate Chrome tab groups.
+Named workspace defaults are stored in extension-local storage. The default `open` policy allows all tabs; `scoped` requires `allowExternal` for outside tabs, while `strict` blocks outside tabs entirely. CLI/MCP session-derived titles are only applied to group-oriented or explicitly scoped commands, so separate Codex sessions can still use separate Chrome tab groups when requested.

@@ -87,9 +87,9 @@ For risk tiers, default timeouts, confirmation requirements, direct `/command` p
 
 The tool reference table below is generated from the shared registry by `npm run docs:commands`.
 
-`chrome_bridge_set_workspace` supports `policyMode: "scoped"` and `policyMode: "strict"`. `strict` blocks outside tabs even when `allowExternal` is passed.
+`chrome_bridge_set_workspace` supports `policyMode: "open"`, `policyMode: "scoped"`, and `policyMode: "strict"`. `open` is the default and allows all tabs; `strict` blocks outside tabs even when `allowExternal` is passed.
 
-`chrome_bridge_tabs` and `chrome_bridge_windows` stay scoped by default. Passing `includeAll: true` requires `confirmed: true` because it can expose unrelated tab URLs and titles.
+`chrome_bridge_tabs` and `chrome_bridge_windows` include all tabs and windows by default. Passing `includeAll: true` remains an explicit confirmation-gated all-tabs request for compatibility.
 
 `chrome_bridge_runtime_smoke` accepts `coveragePlan: true` to print the required smoke coverage checklist offline. The coverage-plan output reports `verification.status: "not-run"`, top-level `nextCommand` / `nextAction`, and does not touch Chrome. Without `coveragePlan`, it is a live real-browser check and should wait until no other session is using the bridge; treat it as complete only when it reports `ok: true`, `coverage.ok: true`, and `verification.status: "passed"`. If the underlying CLI exits nonzero after printing structured JSON, the MCP wrapper preserves that JSON, including failed or skipped `verification` metadata, and adds `cliExitError` for diagnostics.
 
@@ -108,17 +108,17 @@ Navigation tools accept `http:`, `https:`, and `about:blank` URLs. Extension-con
 | `chrome_bridge_extension_path` | `extension-path` | read | 5000 ms | no | no | Print the unpacked extension directory path. |
 | `chrome_bridge_mcp_config` | `mcp-config` | read | 5000 ms | no | no | Print MCP client configuration snippets for Claude Code, Cursor, Codex, VS Code, Windsurf, Hermes, or generic stdio clients. |
 | `chrome_bridge_codex_config` | `codex-config` | read | 5000 ms | no | no | Print the legacy Codex MCP configuration snippet using the current Node executable. |
-| `chrome_bridge_windows` | `windows` | read | 10000 ms | conditional | yes | List Chrome windows, scoped to the configured bridge group by default; includeAll requires confirmation. |
-| `chrome_bridge_tabs` | `tabs` | read | 10000 ms | conditional | yes | List Chrome tabs, scoped to the configured bridge group by default; includeAll requires confirmation. |
+| `chrome_bridge_windows` | `windows` | read | 10000 ms | conditional | yes | List all Chrome windows by default; pass includeAll=false with an explicit group to limit the result. |
+| `chrome_bridge_tabs` | `tabs` | read | 10000 ms | conditional | yes | List all Chrome tabs by default; pass includeAll=false with an explicit group to limit the result. |
 | `chrome_bridge_group` | `group` | read | 10000 ms | no | yes | Show the current scoped Chrome tab group and its tabs. |
-| `chrome_bridge_workspace` | `workspace` | read | 10000 ms | no | yes | Show local workspace defaults, policy mode, and scoped group counts. |
-| `chrome_bridge_set_workspace` | `setWorkspace` | system | 10000 ms | yes | yes | Set local workspace group title, color, and scoped/strict policy defaults. |
-| `chrome_bridge_clear_workspace` | `clearWorkspace` | system | 10000 ms | yes | yes | Clear local workspace defaults and return to the default group policy. |
-| `chrome_bridge_ensure_tab` | `ensureTab` | system | 30000 ms | no | yes | Create or recover the dedicated scoped Chrome work tab. |
-| `chrome_bridge_adopt_tab` | `adoptTab` | interaction | 30000 ms | yes | yes | Adopt an already-open Chrome tab into the scoped bridge group. |
-| `chrome_bridge_open` | `open` | interaction | 30000 ms | no | yes | Open a URL in the scoped bridge tab or a new grouped tab. |
-| `chrome_bridge_activate_tab` | `activateTab` | interaction | 10000 ms | no | yes | Activate a scoped tab and optionally focus its window. |
-| `chrome_bridge_close_tab` | `closeTab` | interaction | 10000 ms | yes | yes | Close one scoped tab. |
+| `chrome_bridge_workspace` | `workspace` | read | 10000 ms | no | yes | Show local workspace defaults, policy mode, and group counts. |
+| `chrome_bridge_set_workspace` | `setWorkspace` | system | 10000 ms | yes | yes | Set local workspace group title, color, and open/scoped/strict policy defaults. |
+| `chrome_bridge_clear_workspace` | `clearWorkspace` | system | 10000 ms | yes | yes | Clear local workspace defaults and return to the default open policy. |
+| `chrome_bridge_ensure_tab` | `ensureTab` | system | 30000 ms | no | yes | Create or recover the active Chrome work tab; explicit scoped policies still use a dedicated group. |
+| `chrome_bridge_adopt_tab` | `adoptTab` | interaction | 30000 ms | yes | yes | Adopt an already-open Chrome tab into an explicit scoped bridge group. |
+| `chrome_bridge_open` | `open` | interaction | 30000 ms | no | yes | Open a URL in the active Chrome tab or a new tab; explicit scoped policies use the bridge group. |
+| `chrome_bridge_activate_tab` | `activateTab` | interaction | 10000 ms | no | yes | Activate any Chrome tab and optionally focus its window. |
+| `chrome_bridge_close_tab` | `closeTab` | interaction | 10000 ms | yes | yes | Close one Chrome tab. |
 | `chrome_bridge_close_group` | `closeGroup` | interaction | 10000 ms | yes | yes | Close all tabs in the scoped bridge group. |
 | `chrome_bridge_back` | `goBack` | interaction | 30000 ms | no | yes | Navigate the selected tab backward. |
 | `chrome_bridge_forward` | `goForward` | interaction | 30000 ms | no | yes | Navigate the selected tab forward. |
@@ -194,7 +194,7 @@ It opens a local extension page in the active scoped group and returns the user'
 
 ## Session-Scoped Groups
 
-MCP commands that operate on the scoped Chrome group derive a per-session default group title when the MCP server process exposes `CHROME_BRIDGE_SESSION_TITLE`, `CODEX_SESSION_TITLE`, `CODEX_THREAD_TITLE`, or `CODEX_THREAD_ID`. For example, `CHROME_BRIDGE_SESSION_TITLE="Kurerok Research"` yields `Codex Bridge - Kurerok Research`; without a title, a short thread id fallback such as `Codex Bridge - 019ea301` is used. Explicit `groupTitle` arguments always override the session-derived default.
+MCP commands can target all Chrome tabs by default. Group-oriented commands may derive a per-session group title from `CHROME_BRIDGE_SESSION_TITLE`, `CODEX_SESSION_TITLE`, `CODEX_THREAD_TITLE`, or `CODEX_THREAD_ID`; explicit `groupTitle` arguments always override that title.
 
 `chrome_bridge_session_summary` includes bridge health, scoped group state, workspace policy state, the active MCP profile summary, concrete `nextActions`, and recommendations such as bridge server restart, extension reload, first-tab setup, or active `strict` policy warnings. `chrome_bridge_debug_bundle` writes the same policy-aware summary into `session-summary.json`.
 

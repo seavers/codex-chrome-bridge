@@ -1,7 +1,7 @@
 import { groupInfo } from './tab-info.js';
 import { withUserFocusPreserved } from './focus-context.js';
 import { disableSavedTabGroupIfSupported } from './tab-group-persistence.js';
-import { groupOptions } from './workspace-policy.js';
+import { groupOptions, isGroupScoped } from './workspace-policy.js';
 
 export async function listTabGroups(query = {}) {
   if (!chrome.tabGroups) return [];
@@ -59,6 +59,8 @@ async function rememberedManagedGroupIds(groupId) {
 }
 
 async function getStoredCodexTab(payload = {}) {
+  if (!(await isGroupScoped(payload))) return getLastFocusedTab();
+
   const { codexTabId, codexWindowId } = await storageGet(['codexTabId', 'codexWindowId']);
   const tabId = chromeId(codexTabId);
   const windowId = chromeId(codexWindowId);
@@ -72,7 +74,7 @@ async function getStoredCodexTab(payload = {}) {
     }
   }
 
-  const tabs = await getCodexGroupTabs(payload);
+  const tabs = (await isGroupScoped(payload)) ? await getCodexGroupTabs(payload) : [await getLastFocusedTab()];
   if (!tabs.length) return null;
 
   const tab = tabs.find((candidate) => candidate.active) || tabs[0];
@@ -98,7 +100,7 @@ export async function getTargetTab(payload = {}, options = {}) {
       throw new Error('allowExternal is blocked by strict workspace policy');
     }
     const tab = await chrome.tabs.get(payloadTabId);
-    if (!payload.allowExternal) {
+    if (!payload.allowExternal && policy.policyMode !== 'open') {
       await assertCodexScopedTab(tab, payload);
     }
     return tab;
@@ -170,6 +172,8 @@ export async function getCodexGroupTabs(payload = {}) {
 }
 
 export async function ensureCodexGroupForTab(tab, payload = {}) {
+  if (!(await isGroupScoped(payload))) return null;
+
   if (!chrome.tabGroups || !chrome.tabs.group) {
     throw new Error('chrome.tabGroups API is unavailable; reload the extension after granting the tabGroups permission');
   }
