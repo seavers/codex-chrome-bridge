@@ -83,6 +83,18 @@ chrome.alarms.create('codex-bridge-ensure-offscreen', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'codex-bridge-ensure-offscreen') startBridge();
 });
+const NATIVE_HOST_NAME = 'com.codex.chrome_bridge';
+const EXTENSION_NAME = 'Chrome MCP Bridge';
+const EXTENSION_VERSION = '0.4.1';
+const SOCKET_PATH = '/tmp/codex-chrome-bridge.sock';
+const RECONNECT_MS = 1500;
+let nativePort = null;
+let reconnectTimer = null;
+let nativeClientIdPromise = null;
+let nativeProfileIdPromise = null;
+let latestBridgeStatus = null;
+connectNativeHost();
+
 installTabGroupPersistenceListeners();
 enforceManagedTabGroupPersistence().catch(() => {});
 startBridge();
@@ -101,6 +113,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'codex-bridge-status') {
     updateActionStatus(message.status || {});
     sendResponse({ ok: true });
+    return undefined;
+  }
+
+  if (message?.type === 'codex-bridge-get-status') {
+    sendResponse({ ok: true, status: latestBridgeStatus });
     return undefined;
   }
 
@@ -145,6 +162,98 @@ function updateActionStatus(status) {
   chrome.action.setTitle({
     title: status.detail ? `Chrome MCP Bridge：${status.detail}` : 'Chrome MCP Bridge',
   }).catch(() => {});
+}
+
+function nativeStorageGet(keys) {
+  return new Promise((resolve) => chrome.storage.local.get(keys, (value) => resolve(value || {})));
+}
+
+function nativeStorageSet(value) {
+  return new Promise((resolve) => chrome.storage.local.set(value, () => resolve()));
+}
+
+function nativeClientId() {
+  if (nativeClientIdPromise) return nativeClientIdPromise;
+  nativeClientIdPromise = nativeStorageGet(['codexBridgeClientId']).then(async (stored) => {
+    if (stored.codexBridgeClientId) return stored.codexBridgeClientId;
+    const generated = crypto.randomUUID();
+    await nativeStorageSet({ codexBridgeClientId: generated });
+    return generated;
+  });
+  return nativeClientIdPromise;
+}
+
+function nativeProfileId() {
+  if (nativeProfileIdPromise) return nativeProfileIdPromise;
+  nativeProfileIdPromise = nativeStorageGet(['codexBridgeProfileId']).then(async (stored) => {
+    if (stored.codexBridgeProfileId) return stored.codexBridgeProfileId;
+    const generated = await nativeClientId();
+    await nativeStorageSet({ codexBridgeProfileId: generated });
+    return generated;
+  });
+  return nativeProfileIdPromise;
+}
+
+async function nativeHello() {
+  return {
+    type: 'hello',
+    info: {
+      clientId: await nativeClientId(),
+      profileId: await nativeProfileId(),
+      extensionId: chrome.runtime.id,
+      version: EXTENSION_VERSION,
+      name: EXTENSION_NAME,
+      context: 'service-worker',
+      transport: 'native-messaging',
+    },
+  };
+}
+
+function publishBridgeStatus(status) {
+  const nextStatus = { ...status, updatedAt: Date.now(), transport: 'native-messaging+unix-socket', socketPath: SOCKET_PATH };
+  latestBridgeStatus = nextStatus;
+  updateActionStatus(nextStatus);
+  nativeStorageSet({ codexBridgeStatus: nextStatus }).catch(() => {});
+  chrome.runtime.sendMessage({ type: 'codex-bridge-status', status: nextStatus }).catch(() => {});
+}
+
+async function handleNativeCommand(command) {
+  if (!command?.id || !command.action || !nativePort) return;
+  publishBridgeStatus({ state: 'working', detail: `正在执行：${command.action}`, action: command.action });
+  try {
+    const result = await dispatch(command.action, command.payload || {});
+    nativePort?.postMessage({ id: command.id, ok: true, result, info: (await nativeHello()).info });
+    publishBridgeStatus({ state: 'connected', detail: `已完成：${command.action}`, action: command.action, response: { ok: true } });
+  } catch (error) {
+    nativePort?.postMessage({ id: command.id, ok: false, code: extensionErrorCode(error), error: String(error?.message || error), details: extensionErrorDetails(error), info: (await nativeHello()).info });
+    publishBridgeStatus({ state: 'error', detail: `执行失败：${command.action}`, action: command.action, response: { ok: false, error: String(error?.message || error) } });
+  }
+}
+
+function reconnectNativeHost() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; connectNativeHost(); }, RECONNECT_MS);
+}
+
+function connectNativeHost() {
+  if (nativePort) return;
+  publishBridgeStatus({ state: 'connecting', detail: '正在连接 Native Messaging Host' });
+  try {
+    nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+    nativePort.onMessage.addListener((message) => handleNativeCommand(message).catch(reconnectNativeHost));
+    nativePort.onDisconnect.addListener(() => {
+      const error = chrome.runtime.lastError;
+      nativePort = null;
+      publishBridgeStatus({ state: 'disconnected', detail: error?.message || 'Native Messaging Host 已断开' });
+      reconnectNativeHost();
+    });
+    publishBridgeStatus({ state: 'connected', detail: '已连接 Native Messaging Host' });
+    nativeHello().then((message) => nativePort?.postMessage(message)).catch(reconnectNativeHost);
+  } catch (error) {
+    nativePort = null;
+    publishBridgeStatus({ state: 'error', detail: `Native Messaging Host 连接失败：${String(error?.message || error)}` });
+    reconnectNativeHost();
+  }
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
