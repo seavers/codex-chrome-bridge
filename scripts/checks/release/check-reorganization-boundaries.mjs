@@ -63,8 +63,6 @@ const expectedScriptPaths = [
   ['check:streamable-http-plan', 'node ./scripts/checks/docs/check-streamable-http-plan.mjs'],
   ['check:privacy', 'node ./scripts/checks/release/check-privacy-scan.mjs'],
   ['check:pack', 'node ./scripts/package/check-package-contents.mjs'],
-  ['install:launch-agent', 'node ./scripts/service/install-launch-agent.mjs'],
-  ['uninstall:launch-agent', 'node ./scripts/service/uninstall-launch-agent.mjs'],
 ];
 
 for (const [scriptName, expectedCommand] of expectedScriptPaths) {
@@ -83,7 +81,6 @@ const forbiddenFlatScripts = [
   'scripts/check-act-preview.mjs',
   'scripts/check-streamable-http-plan.mjs',
   'scripts/check-privacy-scan.mjs',
-  'scripts/install-launch-agent.mjs',
 ];
 
 for (const oldPath of forbiddenFlatScripts) {

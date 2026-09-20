@@ -295,6 +295,17 @@ Uninstall:
 npm run uninstall:native-host
 ```
 
+For a repeatable local deployment, use the repository deployment wrapper:
+
+```bash
+./deploy.sh help
+./deploy.sh paths
+./deploy.sh mcp-info
+./deploy.sh deploy <unpacked-extension-id>
+```
+
+`deploy.sh deploy` runs the local package checks, installs the Native Messaging Host, opens `chrome://extensions/`, reloads the already loaded unpacked extension, and verifies the Native Host, Unix Socket, and extension health. Chrome still requires the first unpacked extension load to be confirmed manually.
+
 ## Project Layout
 
 ```text
@@ -303,7 +314,7 @@ extension/  Chrome Manifest V3 extension
 mcp/        MCP stdio binary wrapper and server implementation modules
 native/     Chrome Native Messaging Host and Unix Socket relay
 shared/     command registry, payload contracts, and cross-surface helpers
-scripts/    verification, packaging, docs, and macOS LaunchAgent helpers
+scripts/    verification, packaging, docs, and Native Host helpers
 docs/       user and developer docs
 examples/   fixture-backed command examples and MCP client config templates
 codex/      optional Codex skill handoff

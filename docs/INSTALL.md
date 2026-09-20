@@ -16,6 +16,8 @@ node ./bin/chrome-bridge.mjs doctor --live-checks
 node ./bin/chrome-bridge.mjs runtime-smoke --summary-only --out /tmp/chrome-bridge-runtime-smoke.json
 ```
 
+For repeated local deployments, run `./deploy.sh deploy <extension-id>`. The wrapper runs the minimum package checks, installs the Native Messaging Host, opens the Chrome extension page, reloads the loaded unpacked extension, and prints bridge health. Use `./deploy.sh mcp-info` to inspect the registered MCP tools and generated stdio server configuration.
+
 ## One-Command And One-Click Status
 
 Use this matrix when deciding how much setup UI to expose for a client.
