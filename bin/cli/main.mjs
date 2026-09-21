@@ -910,6 +910,7 @@ function vscodeMcpJsonConfig() {
 
 function codexTomlConfig() {
   return `[mcp_servers.chrome-bridge]
+enabled = true
 command = ${tomlString(process.execPath)}
 args = [${tomlString(mcpServerPath())}]
 startup_timeout_sec = 20

@@ -23,6 +23,7 @@ Codex TOML example:
 
 ```toml
 [mcp_servers.chrome-bridge]
+enabled = true
 command = "node"
 args = ["/absolute/path/to/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs"]
 startup_timeout_sec = 20

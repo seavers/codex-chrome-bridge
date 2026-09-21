@@ -40,17 +40,14 @@
         </ol>
         <code class="activation-command">node ./bin/chrome-bridge.mjs mcp-config --client &lt;客户端&gt;</code>
         <p class="hint">可用 Claude Code、Cursor、Codex、VS Code、Windsurf/Cascade、Hermes Agent 等 MCP 客户端。</p>
-        <div class="config-title">MCP Servers 配置 JSON</div>
-        <pre class="mcp-config">{
-  "mcpServers": {
-    "chrome-bridge": {
-      "command": "node",
-      "args": [
-        "/Users/lhj/workspace8/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs"
-      ]
-    }
-  }
-}</pre>
+        <div class="config-title">Codex MCP 配置（config.toml）</div>
+        <pre class="mcp-config">[mcp_servers.chrome-bridge]
+enabled = true
+command = "/Users/lhj/.nvm/versions/node/v24.13.0/bin/node"
+args = ["/Users/lhj/workspace8/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60</pre>
+        <p class="hint">如果已有 <code>chrome-bridge-2</code>，请删除旧的重复段，只保留上面的 <code>chrome-bridge</code>。</p>
       </section>
 
       <section class="info-card">
