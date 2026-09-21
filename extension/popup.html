@@ -30,6 +30,18 @@
         <p class="hint">Chrome 通过 Native Messaging Host 按需连接本地 Unix Socket，实际路径由 Host 返回。</p>
       </section>
 
+      <section class="info-card activation-card">
+        <div class="section-title">MCP Server 激活方式</div>
+        <p class="activation-summary">由 MCP 客户端按需通过 stdio 启动，不需要单独运行常驻服务。</p>
+        <ol class="activation-steps">
+          <li>在客户端配置 <code>chrome-bridge-mcp</code>。</li>
+          <li>客户端发起 MCP 请求时自动启动 Server。</li>
+          <li>Server 通过 Native Messaging 激活本扩展。</li>
+        </ol>
+        <code class="activation-command">node ./bin/chrome-bridge.mjs mcp-config --client &lt;客户端&gt;</code>
+        <p class="hint">可用 Claude Code、Cursor、Codex、VS Code、Windsurf/Cascade、Hermes Agent 等 MCP 客户端。</p>
+      </section>
+
       <section class="info-card">
         <div class="section-title">最近动作</div>
         <p id="last-action" class="empty">暂未收到 Codex 请求</p>
