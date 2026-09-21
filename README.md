@@ -243,7 +243,7 @@ When the extension is enabled in more than one Chrome profile, run `node ./bin/c
 Codex TOML example:
 
 ```toml
-[mcp_servers.chrome-bridge]
+[mcp_servers.codex-chrome-bridge]
 enabled = true
 command = "node"
 args = ["/absolute/path/to/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs"]

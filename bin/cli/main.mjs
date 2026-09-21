@@ -909,7 +909,7 @@ function vscodeMcpJsonConfig() {
 }
 
 function codexTomlConfig() {
-  return `[mcp_servers.chrome-bridge]
+  return `[mcp_servers.codex-chrome-bridge]
 enabled = true
 command = ${tomlString(process.execPath)}
 args = [${tomlString(mcpServerPath())}]
@@ -1218,16 +1218,23 @@ function upsertChromeBridgeJsonConfig(existingText, client) {
 }
 
 function upsertCodexTomlConfig(existingText) {
-  const sectionName = 'mcp_servers.chrome-bridge';
   const sectionText = codexTomlConfig().trimEnd();
-  const pattern = /^\[mcp_servers\.chrome-bridge\]\n[\s\S]*?(?=^\[[^\]]+\]\n?|$)/m;
+  const pattern = /^\[mcp_servers\.(?:chrome-bridge|codex-chrome-bridge)\]\n[\s\S]*?(?=^\[[^\]]+\]\n?|$)/gm;
 
   if (!existingText || !existingText.trim()) {
     return `${sectionText}\n`;
   }
 
-  if (pattern.test(existingText)) {
-    return `${existingText.replace(pattern, `${sectionText}\n`).replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
+  // 统一替换新旧配置段，避免重命名后留下旧段或重复段。
+  let replaced = false;
+  const mergedText = existingText.replace(pattern, () => {
+    if (replaced) return '';
+    replaced = true;
+    return `${sectionText}\n`;
+  });
+
+  if (replaced) {
+    return `${mergedText.replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
   }
 
   const separator = existingText.endsWith('\n') ? '\n' : '\n\n';
@@ -1252,7 +1259,7 @@ async function writeMcpClientConfig(args = {}) {
     mergeStrategy = existed ? `merge:${serverKey}` : `create:${serverKey}`;
   } else if (client === 'codex') {
     nextText = upsertCodexTomlConfig(existingText);
-    mergeStrategy = existed ? 'merge:[mcp_servers.chrome-bridge]' : 'create:[mcp_servers.chrome-bridge]';
+    mergeStrategy = existed ? 'merge:[mcp_servers.codex-chrome-bridge]' : 'create:[mcp_servers.codex-chrome-bridge]';
   } else if (existed && existingText !== template.content && !args.force) {
     throw new Error(`Refusing to overwrite existing ${client} config at ${target.path} without --force`);
   }

@@ -85,7 +85,7 @@ check(windsurf?.mcpServers?.['chrome-bridge']?.env?.CHROME_BRIDGE_MCP_TOOL_PROFI
 check(generic?.mcpServers?.['chrome-bridge']?.env?.CHROME_BRIDGE_MCP_TOOL_PROFILE === 'read', 'generic.mcp.json must default to the read profile');
 check(!claude?.mcpServers?.['chrome-bridge']?.env?.CHROME_BRIDGE_MCP_TOOL_PROFILE, 'claude-code.mcp.json must stay on the implicit full profile');
 
-check(codexText?.includes('[mcp_servers.chrome-bridge]'), 'codex.config.toml must define the chrome-bridge MCP server');
+check(codexText?.includes('[mcp_servers.codex-chrome-bridge]'), 'codex.config.toml must define the codex-chrome-bridge MCP server');
 check(codexText?.includes('command = "node"'), 'codex.config.toml must use node as the command');
 check(codexText?.includes('/absolute/path/to/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs'), 'codex.config.toml must point at the checked-in MCP server placeholder path');
 check(codexText?.includes('startup_timeout_sec = 20'), 'codex.config.toml must keep the startup timeout');

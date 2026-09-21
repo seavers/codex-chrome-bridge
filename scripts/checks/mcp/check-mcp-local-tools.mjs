@@ -331,7 +331,7 @@ await withMcpClient(async (client) => {
     arguments: {},
   });
   const codexConfigText = codexConfig?.content?.find((item) => item?.type === 'text')?.text;
-  check(codexConfigText?.includes('[mcp_servers.chrome-bridge]'), 'MCP codex-config tool must return a Codex MCP server section');
+  check(codexConfigText?.includes('[mcp_servers.codex-chrome-bridge]'), 'MCP codex-config tool must return a Codex MCP server section');
   check(codexConfigText?.includes('mcp/chrome-bridge-mcp.mjs'), 'MCP codex-config tool must point at the local MCP server file');
 });
 

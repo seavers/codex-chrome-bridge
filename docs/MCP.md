@@ -22,7 +22,7 @@ node ./bin/chrome-bridge.mjs mcp-config --client hermes
 Codex TOML example:
 
 ```toml
-[mcp_servers.chrome-bridge]
+[mcp_servers.codex-chrome-bridge]
 enabled = true
 command = "node"
 args = ["/absolute/path/to/codex-chrome-bridge/mcp/chrome-bridge-mcp.mjs"]

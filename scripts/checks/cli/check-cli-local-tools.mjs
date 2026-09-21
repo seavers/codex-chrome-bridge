@@ -1063,7 +1063,7 @@ const mcpWriteCodexResult = await runCli(['mcp-write', '--client', 'codex', '--r
 check(mcpWriteCodexResult.ok, 'CLI mcp-write --client codex must merge into project-local config');
 const codexConfigText = await fs.readFile(codexConfigPath, 'utf8');
 check(codexConfigText.includes('[mcp_servers.other]'), 'CLI mcp-write codex must preserve other MCP server sections');
-check(codexConfigText.includes('[mcp_servers.chrome-bridge]'), 'CLI mcp-write codex must add the chrome-bridge MCP section');
+check(codexConfigText.includes('[mcp_servers.codex-chrome-bridge]'), 'CLI mcp-write codex must add the codex-chrome-bridge MCP section');
 
 const hermesWriteResult = await runCli(['mcp-write', '--client', 'hermes', '--root', mcpWriteTmpDir]);
 check(!hermesWriteResult.ok, 'CLI mcp-write hermes without --out must fail closed');
@@ -1074,7 +1074,7 @@ check(
 
 const codexConfigResult = await runCli(['codex-config']);
 check(codexConfigResult.ok, 'CLI codex-config must succeed offline');
-check(codexConfigResult.stdout.includes('[mcp_servers.chrome-bridge]'), 'CLI codex-config must return a Codex MCP server section');
+check(codexConfigResult.stdout.includes('[mcp_servers.codex-chrome-bridge]'), 'CLI codex-config must return a Codex MCP server section');
 check(codexConfigResult.stdout.includes('mcp/chrome-bridge-mcp.mjs'), 'CLI codex-config must point at the local MCP server file');
 
 const catalogResult = await runCli(['command-catalog']);
