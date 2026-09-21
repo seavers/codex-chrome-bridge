@@ -5,8 +5,8 @@
   color: #202124;
 }
 
-body { width: 360px; margin: 0; background: #f8f9fa; }
-.panel { padding: 18px; }
+body { width: 520px; margin: 0; background: #f8f9fa; }
+.panel { padding: 22px; }
 .header, .status-line, footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .eyebrow { margin: 0 0 4px; color: #5f6368; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
 h1 { margin: 0; font-size: 18px; font-weight: 650; }
