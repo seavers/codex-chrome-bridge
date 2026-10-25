@@ -4,7 +4,7 @@ import {
   traceEventsForTab,
   traceSummaryForTab,
 } from './debugger-session.js';
-import { requireConfirmed } from './safety-gates.js';
+import { requireConfirmed, requireSensitiveConfirmed } from './safety-gates.js';
 import { getTargetTab } from './workspace-tabs.js';
 
 export async function traceStart(payload) {
