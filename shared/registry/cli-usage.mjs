@@ -47,7 +47,7 @@ export const CLI_USAGE_LINES = Object.freeze([
   'chrome-bridge fill-form --fields-json <json> [--dry-run] [--confirm] [--tab <id>] [--allow-external]',
   'chrome-bridge handle-dialog --confirm [--dismiss] [--prompt-text <text>] [--tab <id>] [--allow-external]',
   'chrome-bridge upload-file (--selector <css> | --ref <ref>) (--file <path> | --files-json <json>) --confirm [--tab <id>] [--allow-external]',
-  'chrome-bridge trace-start --confirm [--tab <id>] [--max-events 500] [--no-network] [--no-console] [--include-extension-events] [--allow-external]',
+  'chrome-bridge trace-start --confirm [--tab <id>] [--max-events 500] [--no-network] [--no-console] [--include-extension-events] [--include-response-bodies --confirm-sensitive] [--response-url-contains <text>] [--allow-external]',
   'chrome-bridge trace-summary [--tab <id>] [--allow-external]',
   'chrome-bridge trace-events [--tab <id>] [--limit 100] [--allow-external]',
   'chrome-bridge diagnostics [--tab <id>] [--out <file>] [--allow-external]',

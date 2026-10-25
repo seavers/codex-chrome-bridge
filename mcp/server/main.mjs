@@ -1897,14 +1897,17 @@ server.tool(
 
 server.tool(
   'chrome_bridge_trace_start',
-  'Start bounded console/network tracing for the selected tab. Requires confirmed=true; headers and bodies are not captured.',
+  'Start bounded console/network tracing for the selected tab. JSON response bodies are opt-in and require confirmSensitive=true.',
   {
     tabId: chromeIdSchema.optional(),
     maxEvents: z.number().min(50).max(2000).optional(),
     network: z.boolean().optional(),
     console: z.boolean().optional(),
     includeExtensionEvents: z.boolean().optional(),
+    includeResponseBodies: z.boolean().optional(),
+    responseUrlIncludes: z.string().optional(),
     confirmed: z.boolean(),
+    confirmSensitive: z.boolean().optional(),
     allowExternal: z.boolean().optional(),
   },
   async (args) => textResult(await bridgeCommand('traceStart', args, 30_000)),

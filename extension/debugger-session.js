@@ -3,6 +3,8 @@ import { chromeId } from './workspace-tabs.js';
 
 const DEBUGGER_PROTOCOL_VERSION = '1.3';
 const MAX_TRACE_EVENTS = 500;
+const MAX_RESPONSE_BODIES = 20;
+const MAX_RESPONSE_BODY_BYTES = 64 * 1024;
 
 const traceSessions = new Map();
 const debuggerLocks = new Map();
@@ -70,9 +72,79 @@ function pushTraceEvent(tabId, event) {
   }
 }
 
-export function recordDebuggerEvent(source, method, params = {}) {
+async function captureJsonResponseBody(tabId, requestId, session) {
+  const response = session.responses.get(requestId);
+  if (!response || !session.active || !session.includeResponseBodies) return;
+  if (session.responseBodyCount >= MAX_RESPONSE_BODIES) return;
+  if (session.responseUrlIncludes && !response.url.includes(session.responseUrlIncludes)) return;
+  if (!/(?:application|text)\/(?:[\w.-]+\+)?json\b/i.test(response.mimeType || '')) return;
+
+  session.responseBodyCount += 1;
+  try {
+    const result = await sendDebuggerCommand(tabId, 'Network.getResponseBody', { requestId });
+    const encodedBody = String(result?.body || '');
+    const bodyTooLarge = result?.base64Encoded
+      ? encodedBody.length > Math.ceil(MAX_RESPONSE_BODY_BYTES / 3) * 4
+      : encodedBody.length > MAX_RESPONSE_BODY_BYTES;
+    if (bodyTooLarge) {
+      pushTraceEvent(tabId, {
+        kind: 'network.responseBodySkipped',
+        requestId,
+        url: response.url,
+        reason: 'body_too_large',
+        maxBytes: MAX_RESPONSE_BODY_BYTES,
+      });
+      return;
+    }
+
+    // CDP 只在响应完成后提供正文；先限制大小，再解码和解析 JSON。
+    const rawBody = result?.base64Encoded
+      ? new TextDecoder().decode(Uint8Array.from(atob(encodedBody), (character) => character.charCodeAt(0)))
+      : encodedBody;
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_RESPONSE_BODY_BYTES) {
+      pushTraceEvent(tabId, {
+        kind: 'network.responseBodySkipped',
+        requestId,
+        url: response.url,
+        reason: 'body_too_large',
+        maxBytes: MAX_RESPONSE_BODY_BYTES,
+      });
+      return;
+    }
+
+    let json;
+    try {
+      json = JSON.parse(rawBody);
+    } catch {
+      pushTraceEvent(tabId, { kind: 'network.responseBodySkipped', requestId, url: response.url, reason: 'invalid_json' });
+      return;
+    }
+
+    pushTraceEvent(tabId, {
+      kind: 'network.responseBody',
+      requestId,
+      url: response.url,
+      status: response.status,
+      mimeType: response.mimeType,
+      body: json,
+    });
+  } catch (error) {
+    pushTraceEvent(tabId, {
+      kind: 'network.responseBodySkipped',
+      requestId,
+      url: response.url,
+      reason: 'body_unavailable',
+      error: String(error?.message || error).slice(0, 200),
+    });
+  } finally {
+    session.responses.delete(requestId);
+  }
+}
+
+export async function recordDebuggerEvent(source, method, params = {}) {
   const tabId = source?.tabId;
   if (chromeId(tabId) === null) return;
+  const session = traceSessions.get(tabId);
 
   if (method === 'Runtime.consoleAPICalled') {
     pushTraceEvent(tabId, {
@@ -113,6 +185,13 @@ export function recordDebuggerEvent(source, method, params = {}) {
 
   if (method === 'Network.responseReceived') {
     const response = params.response || {};
+    if (session?.active && session.includeResponseBodies) {
+      session.responses.set(params.requestId, {
+        url: response.url,
+        status: response.status,
+        mimeType: response.mimeType,
+      });
+    }
     pushTraceEvent(tabId, {
       kind: 'network.response',
       requestId: params.requestId,
@@ -127,7 +206,16 @@ export function recordDebuggerEvent(source, method, params = {}) {
     return;
   }
 
+  if (method === 'Network.loadingFinished') {
+    if (session?.active && session.includeResponseBodies) {
+      await captureJsonResponseBody(tabId, params.requestId, session);
+    }
+    session?.responses.delete(params.requestId);
+    return;
+  }
+
   if (method === 'Network.loadingFailed') {
+    session?.responses.delete(params.requestId);
     pushTraceEvent(tabId, {
       kind: 'network.failed',
       requestId: params.requestId,
@@ -161,6 +249,10 @@ export async function startTraceForTab(tab, payload = {}) {
       startedAt: new Date().toISOString(),
       maxEvents: Math.min(Math.max(Number(payload.maxEvents || MAX_TRACE_EVENTS), 50), 2_000),
       includeExtensionEvents: Boolean(payload.includeExtensionEvents),
+      includeResponseBodies: Boolean(payload.includeResponseBodies),
+      responseUrlIncludes: typeof payload.responseUrlIncludes === 'string' ? payload.responseUrlIncludes : '',
+      responseBodyCount: 0,
+      responses: new Map(),
       events: [],
     };
     traceSessions.set(tab.id, session);

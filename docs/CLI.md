@@ -68,7 +68,7 @@ The command metadata table below is generated from the shared registry by `npm r
 | `fill-form` | `fillForm` | interaction | 30000 ms | yes | yes | Preview or apply field values without submitting or returning raw field values. |
 | `handle-dialog` | `handleDialog` | interaction | 30000 ms | yes | yes | Accept or dismiss the currently open JavaScript dialog. |
 | `upload-file` | `uploadFile` | interaction | 60000 ms | yes | yes | Set local files on a file input through Chrome Debugger. |
-| `trace-start` | `traceStart` | system | 30000 ms | yes | yes | Start bounded console and network metadata tracing. |
+| `trace-start` | `traceStart` | system | 30000 ms | yes | yes | Start bounded console and network tracing; JSON response bodies require sensitive confirmation. |
 | `trace-summary` | `traceSummary` | read | 30000 ms | no | yes | Read trace session metadata without returning the trace event log. |
 | `trace-events` | `traceEvents` | read | 30000 ms | no | yes | Read recent bounded trace events. |
 | `diagnostics` | `diagnostics` | read | 30000 ms | no | yes | Read bounded page, trace, network-count, resource, and performance diagnostics without raw event logs. |
@@ -269,7 +269,7 @@ Use `--trusted` when you need Chrome Debugger input events rather than DOM-dispa
 
 <!-- BEGIN GENERATED CLI USAGE: trace -->
 ```bash
-chrome-bridge trace-start --confirm [--tab <id>] [--max-events 500] [--no-network] [--no-console] [--include-extension-events] [--allow-external]
+chrome-bridge trace-start --confirm [--tab <id>] [--max-events 500] [--no-network] [--no-console] [--include-extension-events] [--include-response-bodies --confirm-sensitive] [--response-url-contains <text>] [--allow-external]
 chrome-bridge trace-summary [--tab <id>] [--allow-external]
 chrome-bridge trace-events [--tab <id>] [--limit 100] [--allow-external]
 chrome-bridge diagnostics [--tab <id>] [--out <file>] [--allow-external]
@@ -281,7 +281,9 @@ chrome-bridge trace-stop [--tab <id>] [--limit 100] [--allow-external]
 ```
 <!-- END GENERATED CLI USAGE: trace -->
 
-Trace captures bounded console and network metadata. It does not capture request or response bodies. Use `trace-summary` when you only need active state, timing, and event counts without returning console or network event logs.
+Trace captures bounded console and network metadata by default. To collect parsed JSON response bodies, opt in with `--include-response-bodies --confirm-sensitive`; optionally pass `--response-url-contains <text>` to filter response URLs. Capture is limited to JSON MIME types, 20 bodies per session, and 64 KiB per body. Use `trace-events` to read captured bodies. Treat the output as private page data.
+
+The equivalent MCP fields are `includeResponseBodies`, `responseUrlIncludes`, and `confirmSensitive: true`.
 
 ## Browser Data
 

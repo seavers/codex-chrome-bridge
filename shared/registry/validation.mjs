@@ -192,6 +192,7 @@ function requiresSensitiveConfirmed(action, payload) {
   }
   if (action === 'storageSnapshot') return Boolean(payload.includeValues);
   if (action === 'fetchUrl') return payload.credentials === 'include';
+  if (action === 'traceStart') return payload.includeResponseBodies === true;
   return false;
 }
 
@@ -211,10 +212,10 @@ export function validateCommandPayload(action, payload = {}) {
   }
   ensureNonNegativeInteger(normalizedPayload, 'tabId', action);
   ensureNonNegativeInteger(normalizedPayload, 'index', action);
-  for (const key of ['includeAll', 'includeTabs', 'active', 'newTab', 'allowExternal', 'focusWindow', 'confirmed', 'confirmSensitive', 'bypassCache', 'visible', 'outer', 'fullPage', 'landscape', 'printBackground', 'preferCssPageSize', 'trusted', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey', 'network', 'console', 'includeExtensionEvents', 'includeValues', 'allowText', 'closeOnAnswer', 'dryRun', 'accept', 'mobile']) {
+  for (const key of ['includeAll', 'includeTabs', 'active', 'newTab', 'allowExternal', 'focusWindow', 'confirmed', 'confirmSensitive', 'bypassCache', 'visible', 'outer', 'fullPage', 'landscape', 'printBackground', 'preferCssPageSize', 'trusted', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey', 'network', 'console', 'includeExtensionEvents', 'includeResponseBodies', 'includeValues', 'allowText', 'closeOnAnswer', 'dryRun', 'accept', 'mobile']) {
     ensureBoolean(normalizedPayload, key, action);
   }
-  for (const key of ['url', 'selector', 'elementRef', 'targetSelector', 'targetElementRef', 'role', 'text', 'nearText', 'placeholder', 'href', 'actionKind', 'risk', 'kind', 'fallback', 'pageRanges', 'button', 'key', 'code', 'value', 'label', 'file', 'query', 'domain', 'name', 'method', 'credentials', 'question', 'groupTitle', 'groupColor', 'promptText', 'policyMode', 'waitForText', 'waitForPattern', 'networkProfile']) {
+  for (const key of ['url', 'selector', 'elementRef', 'targetSelector', 'targetElementRef', 'role', 'text', 'nearText', 'placeholder', 'href', 'actionKind', 'risk', 'kind', 'fallback', 'pageRanges', 'button', 'key', 'code', 'value', 'label', 'file', 'query', 'domain', 'name', 'method', 'credentials', 'question', 'groupTitle', 'groupColor', 'promptText', 'policyMode', 'waitForText', 'waitForPattern', 'networkProfile', 'responseUrlIncludes']) {
     ensureString(normalizedPayload, key, action);
   }
   ensureStringArray(normalizedPayload, 'files', action);
@@ -265,6 +266,16 @@ export function validateCommandPayload(action, payload = {}) {
   }
   if (action === 'traceStart') {
     ensureNumberRange(normalizedPayload, 'maxEvents', action, 50, 2_000);
+    ensureString(normalizedPayload, 'responseUrlIncludes', action);
+    if (normalizedPayload.includeResponseBodies && normalizedPayload.network === false) {
+      throw payloadError('traceStart.includeResponseBodies requires network tracing');
+    }
+    if (normalizedPayload.responseUrlIncludes !== undefined && !normalizedPayload.includeResponseBodies) {
+      throw payloadError('traceStart.responseUrlIncludes requires response-body capture');
+    }
+    if (normalizedPayload.includeResponseBodies && normalizedPayload.responseUrlIncludes !== undefined) {
+      ensureNonEmptyString(normalizedPayload, 'responseUrlIncludes', action);
+    }
   }
   if (['traceEvents', 'traceStop'].includes(action)) {
     ensureNumberRange(normalizedPayload, 'limit', action, 1, 2_000);

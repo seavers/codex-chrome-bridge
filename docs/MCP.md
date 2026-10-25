@@ -84,6 +84,8 @@ Set `CHROME_BRIDGE_RECORDING_PATH=/tmp/chrome-bridge-actions.jsonl` before start
 
 ## Tools
 
+`chrome_bridge_trace_start` can opt in to parsed JSON response bodies with `includeResponseBodies: true` and `confirmSensitive: true`. Set `responseUrlIncludes` to a URL substring to narrow collection; capture is limited to JSON MIME types, 20 bodies per session, and 64 KiB per body. Then read the `network.responseBody` events with `chrome_bridge_trace_events`.
+
 For risk tiers, default timeouts, confirmation requirements, direct `/command` payload keys, CLI aliases, MCP tool names, local diagnostic/tooling commands, and live-bridge flags, see the generated [command catalog](COMMAND-CATALOG.md) or call `chrome_bridge_command_catalog`.
 
 The tool reference table below is generated from the shared registry by `npm run docs:commands`.
@@ -154,7 +156,7 @@ Navigation tools accept `http:`, `https:`, and `about:blank` URLs. Extension-con
 | `chrome_bridge_handle_dialog` | `handleDialog` | interaction | 30000 ms | yes | yes | Accept or dismiss the currently open JavaScript dialog. |
 | `chrome_bridge_upload_file` | `uploadFile` | interaction | 60000 ms | yes | yes | Set local files on a file input through Chrome Debugger. |
 | `chrome_bridge_scroll` | `scroll` | interaction | 10000 ms | no | yes | Scroll the selected tab. |
-| `chrome_bridge_trace_start` | `traceStart` | system | 30000 ms | yes | yes | Start bounded console and network metadata tracing. |
+| `chrome_bridge_trace_start` | `traceStart` | system | 30000 ms | yes | yes | Start bounded console and network tracing; JSON response bodies require sensitive confirmation. |
 | `chrome_bridge_trace_summary` | `traceSummary` | read | 30000 ms | no | yes | Read trace session metadata without returning the trace event log. |
 | `chrome_bridge_trace_events` | `traceEvents` | read | 30000 ms | no | yes | Read recent bounded trace events. |
 | `chrome_bridge_diagnostics` | `diagnostics` | read | 30000 ms | no | yes | Read bounded page, trace, network-count, resource, and performance diagnostics without raw event logs. |

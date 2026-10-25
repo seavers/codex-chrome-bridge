@@ -404,7 +404,7 @@ for (const action of EXTENSION_ACTIONS) {
     check(metadata.requiresConfirmation, `${action} sensitive confirmation must also require confirmation`);
     check(metadata.allowedKeys.includes('confirmSensitive'), `${action} sensitive action must allow confirmSensitive`);
   } else {
-    check(!metadata.allowedKeys.includes('confirmSensitive'), `${action} non-sensitive action must not allow confirmSensitive`);
+    check(!metadata.allowedKeys.includes('confirmSensitive') || action === 'traceStart', `${action} non-sensitive action must not allow confirmSensitive`);
   }
   if (metadata.requiresConditionalConfirmation) {
     check(!metadata.requiresConfirmation, `${action} conditional confirmation should not force every scoped read to confirm`);
@@ -545,6 +545,10 @@ expectPayload('fetchUrl', { url: 'https://example.com', credentials: 'include', 
 expectPayload('fetchUrl', { url: 'https://example.com', maxChars: 1, confirmed: true }, false, 'fetchUrl invalid maxChars payload');
 expectPayload('traceStart', { maxEvents: 50, confirmed: true }, true, 'traceStart maxEvents payload');
 expectPayload('traceStart', { maxEvents: 1, confirmed: true }, false, 'traceStart invalid maxEvents payload');
+expectPayload('traceStart', { confirmed: true, includeResponseBodies: true }, false, 'traceStart response bodies require sensitive confirmation');
+expectPayload('traceStart', { confirmed: true, confirmSensitive: true, includeResponseBodies: true }, true, 'traceStart response bodies accept sensitive confirmation');
+expectPayload('traceStart', { confirmed: true, confirmSensitive: true, includeResponseBodies: true, network: false }, false, 'traceStart response bodies require network tracing');
+expectPayload('traceStart', { confirmed: true, responseUrlIncludes: 'api/item' }, false, 'traceStart URL filter requires response-body capture');
 expectPayload('traceSummary', {}, true, 'traceSummary read payload');
 expectPayload('traceSummary', { allowExternal: true }, true, 'traceSummary allowExternal payload');
 expectPayload('traceEvents', { limit: 2_000 }, true, 'traceEvents limit payload');

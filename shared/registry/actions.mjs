@@ -75,7 +75,7 @@ export const COMMAND_PAYLOAD_SCHEMAS = freezeSchemaMap({
   fillForm: [...confirmed, 'fields', 'dryRun'],
   handleDialog: [...confirmed, 'accept', 'promptText'],
   uploadFile: [...confirmed, 'selector', 'elementRef', 'file', 'files'],
-  traceStart: [...confirmed, 'maxEvents', 'network', 'console', 'includeExtensionEvents'],
+  traceStart: [...sensitiveConfirmed, 'maxEvents', 'network', 'console', 'includeExtensionEvents', 'includeResponseBodies', 'responseUrlIncludes'],
   traceSummary: base,
   traceEvents: [...base, 'limit'],
   traceStop: [...base, 'limit'],

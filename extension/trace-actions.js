@@ -9,6 +9,7 @@ import { getTargetTab } from './workspace-tabs.js';
 
 export async function traceStart(payload) {
   requireConfirmed(payload, 'traceStart');
+  if (payload.includeResponseBodies) requireSensitiveConfirmed(payload, 'traceStart');
   const tab = await getTargetTab(payload);
   return startTraceForTab(tab, payload);
 }

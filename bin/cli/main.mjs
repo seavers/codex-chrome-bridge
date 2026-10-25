@@ -1725,7 +1725,7 @@ async function selfTest() {
     { label: 'extension module', item: 'browser data imports', ok: background.includes("from './browser-data.js'") },
     { label: 'extension module', item: 'browser data exports', ok: browserData.includes('export async function historySearch') && browserData.includes('export async function cookiesList') },
     { label: 'extension module', item: 'debugger session imports', ok: background.includes("from './debugger-session.js'") },
-    { label: 'extension module', item: 'debugger session exports', ok: debuggerSession.includes('export async function withDebugger') && debuggerSession.includes('export function recordDebuggerEvent') },
+    { label: 'extension module', item: 'debugger session exports', ok: debuggerSession.includes('export async function withDebugger') && debuggerSession.includes('export async function recordDebuggerEvent') },
     { label: 'extension module', item: 'extension error imports', ok: background.includes("from './extension-errors.js'") },
     { label: 'extension module', item: 'extension error exports', ok: extensionErrors.includes('export function extensionErrorCode') },
     { label: 'extension module', item: 'keyboard events imports', ok: pageInteractions.includes("from './keyboard-events.js'") },
@@ -1918,7 +1918,7 @@ async function selfTest() {
         && traceActions.includes('startTraceForTab')
         && traceActions.includes('stopTraceForTab'),
     },
-    { label: 'trace privacy', item: 'no response body capture', ok: !background.includes('Network.getResponseBody') },
+    { label: 'trace privacy', item: 'response body capture is explicit and sensitive-confirmed', ok: debuggerSession.includes('session.includeResponseBodies') && traceActions.includes("requireSensitiveConfirmed(payload, 'traceStart')") && COMMAND_METADATA.traceStart.summary.includes('JSON response bodies require sensitive confirmation') },
     {
       label: 'safety gate',
       item: 'press trusted input is opt-in',
@@ -3923,6 +3923,9 @@ export async function main() {
 
   if (cmd === 'trace-start') {
     if (!args.confirm) throw new Error('trace-start requires --confirm');
+    if (args['include-response-bodies'] && !args['confirm-sensitive']) {
+      throw new Error('trace-start --include-response-bodies requires --confirm-sensitive');
+    }
     printJson(await command('traceStart', {
       ...targetPayload(args),
       ...confirmationPayload(args),
@@ -3930,6 +3933,8 @@ export async function main() {
       network: !args['no-network'],
       console: !args['no-console'],
       includeExtensionEvents: Boolean(args['include-extension-events']),
+      includeResponseBodies: Boolean(args['include-response-bodies']),
+      responseUrlIncludes: args['response-url-contains'],
     }, 30_000));
     return;
   }

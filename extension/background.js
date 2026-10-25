@@ -92,7 +92,7 @@ enforceManagedTabGroupPersistence().catch(() => {});
 
 if (chrome.debugger?.onEvent) {
   chrome.debugger.onEvent.addListener((source, method, params) => {
-    recordDebuggerEvent(source, method, params);
+    recordDebuggerEvent(source, method, params).catch(() => {});
   });
 
   chrome.debugger.onDetach.addListener((source, reason) => {

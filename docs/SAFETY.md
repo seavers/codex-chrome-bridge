@@ -80,6 +80,7 @@ Agents using this bridge should:
 - Use `ask` / `chrome_bridge_ask_user` for manual confirmations and CAPTCHA coordination; do not implement automatic CAPTCHA bypass.
 - Redact private dashboard content from bug reports and public logs.
 - Keep `debug-bundle` page artifacts and full trace events disabled by default; enable snapshot, observe, screenshot, or full trace artifacts only for local reports where page content and URLs are safe to include.
+- Trace response-body collection is off by default. Enabling `includeResponseBodies` exposes JSON returned by the selected tab, so it requires `confirmSensitive: true` and is bounded to 20 bodies of at most 64 KiB each.
 - Treat page extraction output as potentially private page content; form extraction reports field structure and value state, not current form values.
 - Treat form previews as potentially sensitive; `fill-form` reports field value states, not current or planned raw values.
 - Use `select-options` for available-option discovery only; it omits the current selected value/option from read-only output.

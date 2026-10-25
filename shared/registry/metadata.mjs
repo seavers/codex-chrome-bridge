@@ -267,7 +267,7 @@ const ACTION_DOCS = Object.freeze({
   },
   traceStart: {
     category: 'debug',
-    summary: 'Start bounded console and network metadata tracing.',
+    summary: 'Start bounded console and network tracing; JSON response bodies require sensitive confirmation.',
     cli: ['trace-start'],
     mcp: ['chrome_bridge_trace_start'],
     requiresConfirmation: true,

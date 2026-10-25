@@ -45,7 +45,7 @@ Version: 0.4.1
 | fillForm | interaction | interaction | 30000 ms | fill-form | chrome_bridge_fill_form | yes | tabId, allowExternal, groupTitle, groupColor, confirmed, fields, dryRun | Preview or apply field values without submitting or returning raw field values. |
 | handleDialog | interaction | interaction | 30000 ms | handle-dialog | chrome_bridge_handle_dialog | yes | tabId, allowExternal, groupTitle, groupColor, confirmed, accept, promptText | Accept or dismiss the currently open JavaScript dialog. |
 | uploadFile | interaction | interaction | 60000 ms | upload-file | chrome_bridge_upload_file | yes | tabId, allowExternal, groupTitle, groupColor, confirmed, selector, elementRef, file, files | Set local files on a file input through Chrome Debugger. |
-| traceStart | debug | system | 30000 ms | trace-start | chrome_bridge_trace_start | yes | tabId, allowExternal, groupTitle, groupColor, confirmed, maxEvents, network, console, includeExtensionEvents | Start bounded console and network metadata tracing. |
+| traceStart | debug | system | 30000 ms | trace-start | chrome_bridge_trace_start | yes | tabId, allowExternal, groupTitle, groupColor, confirmed, confirmSensitive, maxEvents, network, console, includeExtensionEvents, includeResponseBodies, responseUrlIncludes | Start bounded console and network tracing; JSON response bodies require sensitive confirmation. |
 | traceSummary | debug | read | 30000 ms | trace-summary | chrome_bridge_trace_summary | no | tabId, allowExternal, groupTitle, groupColor | Read trace session metadata without returning the trace event log. |
 | traceEvents | debug | read | 30000 ms | trace-events | chrome_bridge_trace_events | no | tabId, allowExternal, groupTitle, groupColor, limit | Read recent bounded trace events. |
 | traceStop | debug | system | 30000 ms | trace-stop | chrome_bridge_trace_stop | no | tabId, allowExternal, groupTitle, groupColor, limit | Stop tracing and return recent events. |
@@ -141,7 +141,7 @@ chrome-bridge select-options (--selector <css> | --ref <ref>) [--tab <id>] [--al
 chrome-bridge fill-form --fields-json <json> [--dry-run] [--confirm] [--tab <id>] [--allow-external]
 chrome-bridge handle-dialog --confirm [--dismiss] [--prompt-text <text>] [--tab <id>] [--allow-external]
 chrome-bridge upload-file (--selector <css> | --ref <ref>) (--file <path> | --files-json <json>) --confirm [--tab <id>] [--allow-external]
-chrome-bridge trace-start --confirm [--tab <id>] [--max-events 500] [--no-network] [--no-console] [--include-extension-events] [--allow-external]
+chrome-bridge trace-start --confirm [--tab <id>] [--max-events 500] [--no-network] [--no-console] [--include-extension-events] [--include-response-bodies --confirm-sensitive] [--response-url-contains <text>] [--allow-external]
 chrome-bridge trace-summary [--tab <id>] [--allow-external]
 chrome-bridge trace-events [--tab <id>] [--limit 100] [--allow-external]
 chrome-bridge diagnostics [--tab <id>] [--out <file>] [--allow-external]
